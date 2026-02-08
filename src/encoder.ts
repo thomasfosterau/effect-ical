@@ -108,10 +108,7 @@ const encodeEvent = (event: Types.VEvent): string[] => {
 
   lines.push("BEGIN:VEVENT");
 
-  // Required properties
-  if (!event.dtstart) {
-    throw new EncodeError("VEVENT requires DTSTART property");
-  }
+  // DTSTART is required by RFC 5545
   lines.push(formatContentLine("DTSTART", event.dtstart));
 
   // Optional properties
@@ -288,10 +285,7 @@ const encodeFreeBusy = (freebusy: Types.VFreeBusy): string[] => {
 
   lines.push("BEGIN:VFREEBUSY");
 
-  if (!freebusy.dtstart || !freebusy.dtend) {
-    throw new EncodeError("VFREEBUSY requires DTSTART and DTEND properties");
-  }
-
+  // DTSTART and DTEND are required by RFC 5545
   if (freebusy.uid) {
     lines.push(formatContentLine("UID", freebusy.uid));
   }
@@ -331,10 +325,7 @@ const encodeTimezone = (timezone: Types.VTimezone): string[] => {
 
   lines.push("BEGIN:VTIMEZONE");
 
-  if (!timezone.tzid) {
-    throw new EncodeError("VTIMEZONE requires TZID property");
-  }
-
+  // TZID is required by RFC 5545
   lines.push(formatContentLine("TZID", timezone.tzid));
 
   if (timezone.lastmod) {

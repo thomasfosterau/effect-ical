@@ -207,6 +207,7 @@ describe("iCalendar Encoder", () => {
   it("should fold long lines", () => {
     const event: VEvent = {
       component: "VEVENT",
+      uid: "long-event-123",
       dtstart: "20240101T120000Z",
       summary: "This is a very long summary that should be folded according to RFC 5545 line folding rules to ensure proper formatting",
     };

@@ -108,8 +108,8 @@ const parseComponent = (
   startIndex: number
 ): Either.Either<{ component: any; endIndex: number }, ParseError> => {
   const beginLine = lines[startIndex];
-  if (!beginLine) {
-    return Either.left(new ParseError("Empty component"));
+  if (!beginLine || beginLine.trim() === "") {
+    return Either.left(new ParseError(`Cannot parse component: empty or missing line at index ${startIndex}`));
   }
 
   const beginResult = parseContentLine(beginLine);
