@@ -7,3 +7,4 @@
 export * from "./parser.js";
 export * from "./encoder.js";
 export * from "./types.js";
+export * from "./builder.js";

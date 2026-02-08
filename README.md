@@ -8,6 +8,7 @@ A modern iCalendar (RFC 5545) library for JavaScript/TypeScript using Effect idi
 - 🔄 **Effect-based**: Built using Effect idioms for functional, composable operations
 - 📅 **RFC 5545 Compliant**: Implements the iCalendar format specification
 - ✅ **Encode/Decode**: Full support for encoding and decoding iCalendar files
+- 🏗️ **Builder API**: Fluent interface for creating calendars, events, and todos
 - 🧩 **Component Support**: VEVENT, VTODO, VJOURNAL, VFREEBUSY, VTIMEZONE, and VALARM
 - ⚡ **Built with Bun**: Fast development and testing with Bun runtime
 - 📦 **Changesets**: Versioning with changesets for clean release management
@@ -25,6 +26,47 @@ bun add effect-ical effect
 ```
 
 ## Usage
+
+### Builder API (Recommended)
+
+The builder API provides a fluent, type-safe interface for creating calendars:
+
+```typescript
+import { createCalendar } from "effect-ical";
+
+// Create a calendar with events
+const icalString = createCalendar("-//My Company//My Product//EN")
+  .name("Work Calendar")
+  .event((e) =>
+    e
+      .uid("event123")
+      .dtstart("20240101T120000Z")
+      .dtend("20240101T130000Z")
+      .summary("Team Meeting")
+      .description("Monthly team sync")
+      .location("Conference Room A")
+      .status("CONFIRMED")
+      .addDisplayAlarm("-PT15M", "Meeting in 15 minutes")
+  )
+  .event((e) =>
+    e
+      .uid("event456")
+      .dtstart("20240102T140000Z")
+      .summary("Client Call")
+      .addAttendee("mailto:client@example.com")
+  )
+  .todo((t) =>
+    t
+      .uid("todo123")
+      .summary("Prepare presentation")
+      .due("20240103T170000Z")
+      .status("IN-PROCESS")
+      .percentComplete(50)
+  )
+  .toICalString();
+
+console.log(icalString);
+```
 
 ### Parsing iCalendar Files
 
@@ -92,33 +134,75 @@ const program = encode(calendar);
 const icalString2 = await Effect.runPromise(program);
 ```
 
-### Working with Events
+### Working with Events (Builder API)
 
 ```typescript
-import type { VEvent, VAlarm } from "effect-ical";
+import { createEvent } from "effect-ical";
 
-// Create an event with an alarm
-const event: VEvent = {
-  component: "VEVENT",
-  uid: "event456",
-  dtstart: "20240115T090000Z",
-  dtend: "20240115T100000Z",
-  summary: "Doctor Appointment",
-  location: "Medical Center",
-  status: "CONFIRMED",
-  priority: 1,
-  alarms: [
+// Create an event independently
+const event = createEvent()
+  .uid("event456")
+  .dtstart("20240115T090000Z")
+  .dtend("20240115T100000Z")
+  .summary("Doctor Appointment")
+  .location("Medical Center")
+  .status("CONFIRMED")
+  .priority(1)
+  .addDisplayAlarm("-PT15M", "Appointment reminder")
+  .build();
+```
+
+### Working with Todos (Builder API)
+
+```typescript
+import { createTodo } from "effect-ical";
+
+const todo = createTodo()
+  .uid("todo789")
+  .dtstart("20240201T090000Z")
+  .due("20240205T170000Z")
+  .summary("Complete project documentation")
+  .status("IN-PROCESS")
+  .percentComplete(50)
+  .priority(2)
+  .build();
+```
+
+### Low-Level API (Direct Object Creation)
+
+You can also create calendars directly using TypeScript objects:
+
+```typescript
+import { encodeSync } from "effect-ical";
+import type { VCalendar, VEvent } from "effect-ical";
+
+const calendar: VCalendar = {
+  component: "VCALENDAR",
+  version: "2.0",
+  prodid: "-//My Company//My Product//EN",
+  events: [
     {
-      component: "VALARM",
-      action: "DISPLAY",
-      trigger: "-PT15M", // 15 minutes before
-      description: "Appointment reminder",
+      component: "VEVENT",
+      uid: "event123",
+      dtstart: "20240101T120000Z",
+      dtend: "20240101T130000Z",
+      summary: "Team Meeting",
+      alarms: [
+        {
+          component: "VALARM",
+          action: "DISPLAY",
+          trigger: "-PT15M",
+          description: "Appointment reminder",
+        },
+      ],
     },
   ],
 };
+
+const icalString = encodeSync(calendar);
 ```
 
-### Working with Todos
+### Working with Todos (Low-Level API)
 
 ```typescript
 import type { VTodo } from "effect-ical";

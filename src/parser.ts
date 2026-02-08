@@ -86,10 +86,26 @@ const propertyNameMap: Record<string, string> = {
 };
 
 /**
+ * Properties that should be parsed as numbers
+ */
+const numericProperties = new Set(["PERCENT", "PERCENT-COMPLETE", "PRIORITY", "REPEAT", "SEQUENCE"]);
+
+/**
  * Normalize property name to field name
  */
 const normalizePropertyName = (name: string): string => {
   return propertyNameMap[name] || name.toLowerCase();
+};
+
+/**
+ * Parse property value based on its type
+ */
+const parsePropertyValue = (name: string, value: string): any => {
+  if (numericProperties.has(name)) {
+    const num = parseInt(value, 10);
+    return isNaN(num) ? value : num;
+  }
+  return value;
 };
 
 /**
@@ -110,14 +126,15 @@ const parseProperties = (lines: string[]): Either.Either<Record<string, any>, Pa
 
     const { name, value } = result.right;
     const fieldName = normalizePropertyName(name);
+    const parsedValue = parsePropertyValue(name, value);
     
     if (arrayProps.has(name)) {
       if (!props[fieldName]) {
         props[fieldName] = [];
       }
-      props[fieldName].push(value);
+      props[fieldName].push(parsedValue);
     } else {
-      props[fieldName] = value;
+      props[fieldName] = parsedValue;
     }
   }
 
