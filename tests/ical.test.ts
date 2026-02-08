@@ -3,9 +3,8 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { Effect } from "effect";
-import { parse, parseEither } from "../src/parser";
-import { encode, encodeSync } from "../src/encoder";
+import { parseEither } from "../src/parser";
+import { encodeSync } from "../src/encoder";
 import type { VCalendar, VEvent } from "../src/types";
 
 describe("iCalendar Parser", () => {

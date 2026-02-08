@@ -173,7 +173,8 @@ if (parseResult._tag === "Right") {
 
 This library implements:
 - **RFC 5545**: Internet Calendaring and Scheduling Core Object Specification (iCalendar)
-- Updates from RFC 5546, RFC 6868, RFC 7529, and RFC 7986
+
+Note: Updates from RFC 5546, RFC 6868, RFC 7529, and RFC 7986 are not yet fully implemented.
 
 ## Development
 

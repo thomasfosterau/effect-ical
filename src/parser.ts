@@ -75,29 +75,53 @@ const parseContentLine = (
 };
 
 /**
- * Parse properties into a record
+ * Map RFC property names to camelCase field names
  */
-const parseProperties = (lines: string[]): Record<string, any> => {
+const propertyNameMap: Record<string, string> = {
+  "PERCENT-COMPLETE": "percent",
+  "LAST-MODIFIED": "lastmod",
+  "TZOFFSETFROM": "tzoffsetfrom",
+  "TZOFFSETTO": "tzoffsetto",
+  "TZNAME": "tzname",
+};
+
+/**
+ * Normalize property name to field name
+ */
+const normalizePropertyName = (name: string): string => {
+  return propertyNameMap[name] || name.toLowerCase();
+};
+
+/**
+ * Parse properties into a record
+ * Throws ParseError if any line is invalid
+ */
+const parseProperties = (lines: string[]): Either.Either<Record<string, any>, ParseError> => {
   const props: Record<string, any> = {};
   const arrayProps = new Set(["ATTENDEE", "CATEGORIES", "RDATE", "EXDATE"]);
 
   for (const line of lines) {
     const result = parseContentLine(line);
-    if (Either.isRight(result)) {
-      const { name, value } = result.right;
-      
-      if (arrayProps.has(name)) {
-        if (!props[name.toLowerCase()]) {
-          props[name.toLowerCase()] = [];
-        }
-        props[name.toLowerCase()].push(value);
-      } else {
-        props[name.toLowerCase()] = value;
+    
+    // Propagate parsing errors instead of silently dropping invalid lines
+    if (Either.isLeft(result)) {
+      return Either.left(result.left);
+    }
+
+    const { name, value } = result.right;
+    const fieldName = normalizePropertyName(name);
+    
+    if (arrayProps.has(name)) {
+      if (!props[fieldName]) {
+        props[fieldName] = [];
       }
+      props[fieldName].push(value);
+    } else {
+      props[fieldName] = value;
     }
   }
 
-  return props;
+  return Either.right(props);
 };
 
 /**
@@ -135,22 +159,41 @@ const parseComponent = (
 
     const lineResult = parseContentLine(line);
     if (Either.isLeft(lineResult)) {
-      i++;
-      continue;
+      // Propagate parsing errors instead of silently skipping invalid lines
+      return Either.left(
+        new ParseError(
+          `Error parsing content line at index ${i}: ${lineResult.left.message}`
+        )
+      );
     }
 
     const { name, value } = lineResult.right;
 
     if (name === "END" && value === componentType) {
       // End of component
-      const props = parseProperties(componentLines);
+      const propsResult = parseProperties(componentLines);
+      if (Either.isLeft(propsResult)) {
+        return Either.left(propsResult.left);
+      }
+      
+      const props = propsResult.right;
       props.component = componentType;
 
-      // Add sub-components
+      // Add sub-components based on component type
       if (componentType === "VEVENT" || componentType === "VTODO") {
         const alarms = subComponents.filter((c) => c.component === "VALARM");
         if (alarms.length > 0) {
           props.alarms = alarms;
+        }
+      } else if (componentType === "VTIMEZONE") {
+        // Handle STANDARD and DAYLIGHT sub-components
+        const standard = subComponents.filter((c) => c.component === "STANDARD");
+        const daylight = subComponents.filter((c) => c.component === "DAYLIGHT");
+        if (standard.length > 0) {
+          props.standard = standard;
+        }
+        if (daylight.length > 0) {
+          props.daylight = daylight;
         }
       }
 
@@ -211,6 +254,9 @@ export const parse = (
     // Ensure required properties
     if (!calendar.version) {
       return yield* _(Effect.fail(new ParseError("VERSION property is required")));
+    }
+    if (calendar.version !== "2.0") {
+      return yield* _(Effect.fail(new ParseError(`VERSION must be "2.0", got "${calendar.version}"`)));
     }
     if (!calendar.prodid) {
       return yield* _(Effect.fail(new ParseError("PRODID property is required")));

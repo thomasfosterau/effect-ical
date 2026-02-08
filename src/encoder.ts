@@ -16,23 +16,51 @@ export class EncodeError {
 /**
  * Fold lines according to RFC 5545 (3.1)
  * Lines should be no longer than 75 octets (excluding CRLF)
+ * Uses UTF-8 byte length for proper RFC compliance
  */
 const foldLine = (line: string): string => {
-  if (line.length <= 75) {
+  const textEncoder = new TextEncoder();
+  const lineBytes = textEncoder.encode(line);
+  
+  // If the line fits within 75 octets, return as-is
+  if (lineBytes.length <= 75) {
     return line;
   }
 
   const lines: string[] = [];
-  let remaining = line;
+  let currentLine = "";
+  let currentBytes = 0;
+  let firstLine = true;
+  let maxBytesForCurrentLine = 75; // 75 octets for the first line
 
-  // First line can be up to 75 characters
-  lines.push(remaining.slice(0, 75));
-  remaining = remaining.slice(75);
+  for (const ch of line) {
+    const byteLen = textEncoder.encode(ch).length;
 
-  // Continuation lines start with a space and can be 74 characters (75 - 1 for space)
-  while (remaining.length > 0) {
-    lines.push(" " + remaining.slice(0, 74));
-    remaining = remaining.slice(74);
+    if (currentBytes + byteLen > maxBytesForCurrentLine) {
+      // Flush the current line and start a new one
+      if (firstLine) {
+        lines.push(currentLine);
+        firstLine = false;
+        maxBytesForCurrentLine = 74; // payload bytes for continuation lines (75 - 1 for leading space)
+      } else {
+        lines.push(" " + currentLine);
+      }
+
+      currentLine = ch;
+      currentBytes = byteLen;
+    } else {
+      currentLine += ch;
+      currentBytes += byteLen;
+    }
+  }
+
+  // Push the final line
+  if (currentLine.length > 0) {
+    if (firstLine) {
+      lines.push(currentLine);
+    } else {
+      lines.push(" " + currentLine);
+    }
   }
 
   return lines.join("\r\n");
