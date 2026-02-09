@@ -1,5 +1,5 @@
 {
-  "name": "effect-ical",
+  "name": "@thomasfosterau/effect-ical",
   "version": "0.0.0",
   "description": "iCal (RFC 5545) library using Effect idioms for encoding and decoding iCalendar files",
   "main": "dist/index.js",
