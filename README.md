@@ -1,14 +1,15 @@
-# effect-ical
+# @thomasfosterau/effect-ical
 
 A modern iCalendar (RFC 5545) library for JavaScript/TypeScript using Effect idioms. This library provides type-safe encoding and decoding of iCalendar files with comprehensive support for the iCal format.
 
 ## Features
 
-- 🎯 **Type-safe**: Full TypeScript support with comprehensive type definitions
+- 🎯 **Type-safe**: Full TypeScript support with Effect Schema
 - 🔄 **Effect-based**: Built using Effect idioms for functional, composable operations
+- 📦 **Module Namespaces**: Clean API with Calendar, Event, and Todo modules
+- 🔗 **Pipe API**: Composable functions using Effect's pipe for building calendars
 - 📅 **RFC 5545 Compliant**: Implements the iCalendar format specification
 - ✅ **Encode/Decode**: Full support for encoding and decoding iCalendar files
-- 🏗️ **Builder API**: Fluent interface for creating calendars, events, and todos
 - 🧩 **Component Support**: VEVENT, VTODO, VJOURNAL, VFREEBUSY, VTIMEZONE, and VALARM
 - ⚡ **Built with Bun**: Fast development and testing with Bun runtime
 - 📦 **Changesets**: Versioning with changesets for clean release management
@@ -16,59 +17,110 @@ A modern iCalendar (RFC 5545) library for JavaScript/TypeScript using Effect idi
 ## Installation
 
 ```bash
-npm install effect-ical effect
+npm install @thomasfosterau/effect-ical effect
 ```
 
 or with Bun:
 
 ```bash
-bun add effect-ical effect
+bun add @thomasfosterau/effect-ical effect
 ```
 
 ## Usage
 
-### Builder API (Recommended)
+### Effect-Style API (Recommended)
 
-The builder API provides a fluent, type-safe interface for creating calendars:
+The Effect-style API uses module namespaces and pipe for composable calendar operations:
 
 ```typescript
-import { createCalendar } from "effect-ical";
+import { pipe } from "effect";
+import * as Calendar from "@thomasfosterau/effect-ical/Calendar";
+import * as Event from "@thomasfosterau/effect-ical/Event";
+import * as Todo from "@thomasfosterau/effect-ical/Todo";
 
-// Create a calendar with events
+// Create an event with pipe
+const event = pipe(
+  Event.make("20240115T100000Z"),
+  Event.withUid("event-001"),
+  Event.withSummary("Team Standup"),
+  Event.withDtend("20240115T110000Z"),
+  Event.withLocation("Conference Room A"),
+  Event.withStatus("CONFIRMED")
+);
+
+// Create a todo with pipe
+const todo = pipe(
+  Todo.make(),
+  Todo.withUid("todo-001"),
+  Todo.withSummary("Complete proposal"),
+  Todo.withDue("20240120T170000Z"),
+  Todo.withStatus("IN-PROCESS"),
+  Todo.withPercent(60)
+);
+
+// Build a calendar with pipe
+const calendar = pipe(
+  Calendar.builder(),
+  Calendar.withProdid("-//My Company//My App//EN"),
+  Calendar.withName("Work Calendar"),
+  Calendar.withEvent(event),
+  Calendar.withTodo(todo),
+  Calendar.build
+);
+
+// Encode to iCal format
+const program = Calendar.encode(calendar);
+const icalString = await Effect.runPromise(program);
+console.log(icalString);
+```
+
+### Decoding iCalendar Files
+
+```typescript
+import * as Calendar from "@thomasfosterau/effect-ical/Calendar";
+import { Effect } from "effect";
+
+const icalString = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//My Company//My Product//EN
+BEGIN:VEVENT
+UID:event123
+DTSTART:20240101T120000Z
+DTEND:20240101T130000Z
+SUMMARY:Team Meeting
+DESCRIPTION:Monthly team sync
+LOCATION:Conference Room A
+END:VEVENT
+END:VCALENDAR
+`;
+
+// Decode using Effect
+const program = Calendar.decode(icalString);
+const calendar = await Effect.runPromise(program);
+console.log(calendar.events?.[0]?.summary); // Logs event details
+```
+
+### Legacy APIs (Backward Compatibility)
+
+The library still includes the previous APIs for backward compatibility:
+
+#### Fluent Builder API
+
+```typescript
+import { createCalendar } from "@thomasfosterau/effect-ical";
+
 const icalString = createCalendar("-//My Company//My Product//EN")
   .name("Work Calendar")
   .event((e) =>
     e
       .uid("event123")
       .dtstart("20240101T120000Z")
-      .dtend("20240101T130000Z")
       .summary("Team Meeting")
-      .description("Monthly team sync")
-      .location("Conference Room A")
-      .status("CONFIRMED")
-      .addDisplayAlarm("-PT15M", "Meeting in 15 minutes")
-  )
-  .event((e) =>
-    e
-      .uid("event456")
-      .dtstart("20240102T140000Z")
-      .summary("Client Call")
-      .addAttendee("mailto:client@example.com")
-  )
-  .todo((t) =>
-    t
-      .uid("todo123")
-      .summary("Prepare presentation")
-      .due("20240103T170000Z")
-      .status("IN-PROCESS")
-      .percentComplete(50)
   )
   .toICalString();
-
-console.log(icalString);
 ```
 
-### Parsing iCalendar Files
+#### Low-Level Parser/Encoder API
 
 ```typescript
 import { parse, parseEither } from "effect-ical";
