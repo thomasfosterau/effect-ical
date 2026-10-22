@@ -71,7 +71,7 @@
     "effect": "catalog:peers"
   },
   "engines": {
-    "node": ">=22.18",
+    "node": ">=22",
     "pnpm": ">=11"
   },
   "packageManager": "pnpm@11.28.6"
