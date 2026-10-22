@@ -1,0 +1,766 @@
+{
+  "parse": {
+    "simple": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//Test//EN",
+        "version": "2.0"
+      }
+    },
+    "crlf": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0",
+        "events": [
+          {
+            "uid": "a",
+            "dtstart": "20240101T120000Z",
+            "component": "VEVENT"
+          }
+        ]
+      }
+    },
+    "folded": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0",
+        "events": [
+          {
+            "uid": "e",
+            "dtstart": "20240101T120000Z",
+            "summary": "This is a very long summary that has been folded according to RFC 5545 line folding rules",
+            "description": "tabcontinued",
+            "component": "VEVENT"
+          }
+        ]
+      }
+    },
+    "everyComponent": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0",
+        "calscale": "GREGORIAN",
+        "method": "PUBLISH",
+        "name": "Work",
+        "description": "Work calendar",
+        "timezones": [
+          {
+            "tzid": "Europe/London",
+            "lastmod": "20240101T000000Z",
+            "tzurl": "http://tz.example/london",
+            "component": "VTIMEZONE",
+            "standard": [
+              {
+                "dtstart": "19701025T020000",
+                "tzoffsetfrom": "+0100",
+                "tzoffsetto": "+0000",
+                "tzname": "GMT",
+                "rrule": "FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+                "component": "STANDARD"
+              }
+            ],
+            "daylight": [
+              {
+                "dtstart": "19700329T010000",
+                "tzoffsetfrom": "+0000",
+                "tzoffsetto": "+0100",
+                "tzname": "BST",
+                "component": "DAYLIGHT"
+              }
+            ]
+          }
+        ],
+        "events": [
+          {
+            "uid": "event1",
+            "dtstamp": "20240101T000000Z",
+            "dtstart": "20240101T120000",
+            "dtend": "20240101T130000Z",
+            "summary": "Event\\, escaped",
+            "attendee": ["mailto:john@example.com", "mailto:jane@example.com"],
+            "categories": ["WORK,MEETING", "EXTRA"],
+            "rdate": ["20240201T120000Z"],
+            "exdate": ["20240301T120000Z", "20240401T120000Z"],
+            "priority": 5,
+            "sequence": 2,
+            "geo": "37.386013;-122.082932",
+            "status": "CONFIRMED",
+            "class": "PRIVATE",
+            "component": "VEVENT",
+            "alarms": [
+              {
+                "action": "DISPLAY",
+                "trigger": "-PT15M",
+                "repeat": 3,
+                "duration": "PT5M",
+                "component": "VALARM"
+              },
+              {
+                "action": "AUDIO",
+                "trigger": "-PT5M",
+                "component": "VALARM"
+              }
+            ]
+          }
+        ],
+        "todos": [
+          {
+            "uid": "todo1",
+            "percent": 40,
+            "priority": "high",
+            "component": "VTODO",
+            "alarms": [
+              {
+                "action": "DISPLAY",
+                "trigger": "-PT1H",
+                "component": "VALARM"
+              }
+            ]
+          }
+        ],
+        "journals": [
+          {
+            "uid": "journal1",
+            "summary": "Notes",
+            "component": "VJOURNAL"
+          }
+        ],
+        "freebusys": [
+          {
+            "uid": "fb1",
+            "dtstart": "20240101T000000Z",
+            "dtend": "20240102T000000Z",
+            "freebusy": "20240101T090000Z/20240101T100000Z",
+            "component": "VFREEBUSY"
+          }
+        ]
+      }
+    },
+    "lowercaseNames": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0",
+        "events": [
+          {
+            "summary": "lower",
+            "dtstart": "20240101",
+            "component": "VEVENT"
+          }
+        ]
+      }
+    },
+    "junkAround": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0"
+      }
+    },
+    "noCalendar": {
+      "err": {
+        "tag": "ParseError",
+        "message": "No VCALENDAR component found"
+      }
+    },
+    "empty": {
+      "err": {
+        "tag": "ParseError",
+        "message": "No VCALENDAR component found"
+      }
+    },
+    "missingVersion": {
+      "err": {
+        "tag": "ParseError",
+        "message": "VERSION property is required"
+      }
+    },
+    "wrongVersion": {
+      "err": {
+        "tag": "ParseError",
+        "message": "VERSION must be \"2.0\", got \"1.0\""
+      }
+    },
+    "missingProdid": {
+      "err": {
+        "tag": "ParseError",
+        "message": "PRODID property is required"
+      }
+    },
+    "invalidLineInCalendar": {
+      "err": {
+        "tag": "ParseError",
+        "message": "Error parsing content line at index 3: Invalid content line: not a content line"
+      }
+    },
+    "invalidLineInEvent": {
+      "err": {
+        "tag": "ParseError",
+        "message": "Error parsing content line at index 5: Invalid content line: broken"
+      }
+    },
+    "invalidLineInAlarm": {
+      "err": {
+        "tag": "ParseError",
+        "message": "Error parsing content line at index 7: Invalid content line: broken"
+      }
+    },
+    "unclosedEvent": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0"
+      }
+    },
+    "unclosedCalendar": {
+      "err": {
+        "tag": "ParseError",
+        "message": "Component VCALENDAR not closed"
+      }
+    },
+    "mismatchedEnd": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0",
+        "events": [
+          {
+            "dtstart": "20240101",
+            "end": "VCALENDAR",
+            "component": "VEVENT"
+          }
+        ]
+      }
+    },
+    "unclosedEventThenInvalid": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0"
+      }
+    },
+    "leadingContinuation": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0"
+      }
+    },
+    "whitespaceOnlyLine": {
+      "err": {
+        "tag": "ParseError",
+        "message": "Error parsing content line at index 3: Invalid content line: //EN"
+      }
+    },
+    "duplicateProperty": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Second//EN",
+        "version": "2.0",
+        "events": [
+          {
+            "dtstart": "2",
+            "summary": "b",
+            "component": "VEVENT"
+          }
+        ]
+      }
+    },
+    "oddParameters": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0",
+        "events": [
+          {
+            "dtstart": "20240101",
+            "url": "https://example.com/a:b",
+            "component": "VEVENT"
+          }
+        ]
+      }
+    },
+    "emptyBegin": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0"
+      }
+    },
+    "descriptionAfterEvent": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Test//EN",
+        "version": "2.0",
+        "description": "calendar description",
+        "events": [
+          {
+            "dtstart": "20240101",
+            "description": "event description",
+            "component": "VEVENT"
+          }
+        ]
+      }
+    },
+    "nestedCalendar": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "-//Outer//EN",
+        "version": "2.0"
+      }
+    },
+    "calendarValuesWithColons": {
+      "ok": {
+        "component": "VCALENDAR",
+        "prodid": "urn:example:prodid",
+        "version": "2.0",
+        "method": "REQUEST"
+      }
+    }
+  },
+  "decode": {
+    "simple": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//Test//EN"
+      }
+    },
+    "crlf": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "folded": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN",
+        "description": "tab"
+      }
+    },
+    "everyComponent": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN",
+        "calscale": "GREGORIAN",
+        "method": "PUBLISH",
+        "name": "Work",
+        "description": "Work calendar"
+      }
+    },
+    "lowercaseNames": {
+      "err": {
+        "tag": "ParseError",
+        "message": "PRODID is required"
+      }
+    },
+    "junkAround": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "noCalendar": {
+      "err": {
+        "tag": "ParseError",
+        "message": "PRODID is required"
+      }
+    },
+    "empty": {
+      "err": {
+        "tag": "ParseError",
+        "message": "PRODID is required"
+      }
+    },
+    "missingVersion": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "wrongVersion": {
+      "err": {
+        "tag": "ParseError",
+        "message": "VERSION must be 2.0"
+      }
+    },
+    "missingProdid": {
+      "err": {
+        "tag": "ParseError",
+        "message": "PRODID is required"
+      }
+    },
+    "invalidLineInCalendar": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "invalidLineInEvent": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "invalidLineInAlarm": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "unclosedEvent": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "unclosedCalendar": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "mismatchedEnd": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "unclosedEventThenInvalid": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "leadingContinuation": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "whitespaceOnlyLine": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test"
+      }
+    },
+    "duplicateProperty": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Second//EN"
+      }
+    },
+    "oddParameters": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "emptyBegin": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN"
+      }
+    },
+    "descriptionAfterEvent": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Test//EN",
+        "description": "calendar description"
+      }
+    },
+    "nestedCalendar": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Inner//EN"
+      }
+    },
+    "calendarValuesWithColons": {
+      "ok": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "urn:example:prodid",
+        "method": "REQUEST"
+      }
+    }
+  },
+  "encode": {
+    "minimal": {
+      "ok": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nEND:VCALENDAR\r\n"
+    },
+    "missingVersion": {
+      "err": {
+        "tag": "EncodeError",
+        "message": "VERSION property is required"
+      }
+    },
+    "missingProdid": {
+      "err": {
+        "tag": "EncodeError",
+        "message": "PRODID property is required"
+      }
+    },
+    "emptyProdid": {
+      "err": {
+        "tag": "EncodeError",
+        "message": "PRODID property is required"
+      }
+    },
+    "everything": {
+      "ok": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nNAME:Name\\; with\\, specials\\\\\r\nDESCRIPTION:Line one\\nLine two\r\nBEGIN:VTIMEZONE\r\nTZID:Europe/London\r\nLAST-MODIFIED:20240101T000000Z\r\nTZURL:http://tz.example/london\r\nBEGIN:STANDARD\r\nDTSTART:19701025T020000\r\nTZOFFSETFROM:+0100\r\nTZOFFSETTO:+0000\r\nRRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU\r\nTZNAME:GMT\r\nEND:STANDARD\r\nBEGIN:DAYLIGHT\r\nDTSTART:19700329T010000\r\nTZOFFSETFROM:+0000\r\nTZOFFSETTO:+0100\r\nEND:DAYLIGHT\r\nEND:VTIMEZONE\r\nBEGIN:VTIMEZONE\r\nTZID:UTC\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nDTSTART:20240101T120000Z\r\nUID:event1\r\nDTSTAMP:20240101T000000Z\r\nDTEND:20240101T130000Z\r\nDURATION:PT1H\r\nSUMMARY:Summary\\; with\\, specials\r\nDESCRIPTION:Description\\nwith newline\r\nLOCATION:Room\\, 1\r\nORGANIZER:mailto:org@example.com\r\nATTENDEE:mailto:a@example.com\r\nATTENDEE:mailto:b@example.com\r\nCATEGORIES:WORK,MEETING\r\nSTATUS:CONFIRMED\r\nRRULE:FREQ=WEEKLY;COUNT=4\r\nRDATE:20240201T120000Z\r\nEXDATE:20240301T120000Z\r\nEXDATE:20240401T120000Z\r\nURL:https://example.com/event\r\nGEO:37.386013;-122.082932\r\nPRIORITY:0\r\nCLASS:PUBLIC\r\nBEGIN:VALARM\r\nACTION:EMAIL\r\nTRIGGER:-PT15M\r\nDURATION:PT5M\r\nREPEAT:0\r\nDESCRIPTION:Alarm\\; description\r\nSUMMARY:Alarm\\, summary\r\nATTENDEE:mailto:a@example.com\r\nATTACH:https://example.com/sound.wav\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20240102\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20240103\r\nSUMMARY:This is a very long summary that should be folded according to RFC \r\n 5545 line folding rules to ensure proper formatting\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20240104\r\nDESCRIPTION:Café ☕ réunion — 東京 meeting with 🎉 emoji and ümla\r\n uts Café ☕ réunion — 東京 meeting with 🎉 emoji and ümlauts Caf\r\n é ☕ réunion — 東京 meeting with 🎉 emoji and ümlauts Café ☕ \r\n réunion — 東京 meeting with 🎉 emoji and ümlauts \r\nEND:VEVENT\r\nBEGIN:VTODO\r\nUID:todo1\r\nDTSTAMP:20240101T000000Z\r\nDTSTART:20240101T090000Z\r\nDUE:20240105T170000Z\r\nDURATION:P1D\r\nSUMMARY:Todo\\; summary\r\nDESCRIPTION:Todo\\, description\r\nLOCATION:Desk\r\nSTATUS:IN-PROCESS\r\nPERCENT-COMPLETE:0\r\nCOMPLETED:20240104T170000Z\r\nPRIORITY:9\r\nRRULE:FREQ=DAILY\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT1H\r\nEND:VALARM\r\nEND:VTODO\r\nBEGIN:VTODO\r\nEND:VTODO\r\nBEGIN:VJOURNAL\r\nUID:journal1\r\nDTSTAMP:20240101T000000Z\r\nDTSTART:20240101\r\nSUMMARY:Journal\\; summary\r\nDESCRIPTION:Journal\\, description\r\nSTATUS:FINAL\r\nCLASS:CONFIDENTIAL\r\nEND:VJOURNAL\r\nBEGIN:VJOURNAL\r\nEND:VJOURNAL\r\nBEGIN:VFREEBUSY\r\nUID:fb1\r\nDTSTAMP:20240101T000000Z\r\nDTSTART:20240101T000000Z\r\nDTEND:20240102T000000Z\r\nORGANIZER:mailto:org@example.com\r\nURL:https://example.com/fb\r\nATTENDEE:mailto:a@example.com\r\nFREEBUSY;FBTYPE=BUSY:20240101T090000Z/20240101T100000Z,20240101T110000Z/202\r\n 40101T120000Z\r\nFREEBUSY:20240101T130000Z/PT1H\r\nEND:VFREEBUSY\r\nBEGIN:VFREEBUSY\r\nDTSTART:20240101\r\nDTEND:20240102\r\nEND:VFREEBUSY\r\nEND:VCALENDAR\r\n"
+    },
+    "exactly75": {
+      "ok": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\r\nEND:VCALENDAR\r\n"
+    },
+    "exactly76": {
+      "ok": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\r\n X\r\nEND:VCALENDAR\r\n"
+    },
+    "veryLong": {
+      "ok": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\r\n YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\r\n YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\r\n YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\r\n YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\r\n YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\r\nEND:VCALENDAR\r\n"
+    }
+  },
+  "builder": {
+    "calendarWithEverything": {
+      "component": "VCALENDAR",
+      "version": "2.0",
+      "prodid": "-//Test//EN",
+      "calscale": "GREGORIAN",
+      "method": "PUBLISH",
+      "name": "Name",
+      "description": "Description",
+      "events": [
+        {
+          "component": "VEVENT",
+          "uid": "e1",
+          "dtstart": "20240101T120000Z",
+          "dtend": "20240101T130000Z",
+          "duration": "PT1H",
+          "summary": "Summary",
+          "description": "Description",
+          "location": "Location",
+          "organizer": "mailto:org@example.com",
+          "attendee": ["mailto:a@example.com", "mailto:b@example.com"],
+          "categories": ["A", "B"],
+          "status": "TENTATIVE",
+          "rrule": "FREQ=DAILY",
+          "url": "https://example.com",
+          "geo": {
+            "lat": 1.5,
+            "lon": -2.25
+          },
+          "priority": 3,
+          "class": "PRIVATE",
+          "dtstamp": "20240101T000000Z",
+          "alarms": [
+            {
+              "component": "VALARM",
+              "action": "DISPLAY",
+              "trigger": "-PT15M",
+              "description": "Reminder"
+            },
+            {
+              "component": "VALARM",
+              "action": "DISPLAY",
+              "trigger": "-PT5M"
+            },
+            {
+              "component": "VALARM",
+              "action": "AUDIO",
+              "trigger": "-PT1M"
+            }
+          ]
+        },
+        {
+          "component": "VEVENT",
+          "dtstart": "20240105"
+        }
+      ],
+      "todos": [
+        {
+          "component": "VTODO",
+          "uid": "t1",
+          "dtstart": "20240101",
+          "due": "20240102",
+          "duration": "P1D",
+          "summary": "Todo",
+          "description": "Todo description",
+          "location": "Desk",
+          "status": "COMPLETED",
+          "percent": 100,
+          "completed": "20240102",
+          "priority": 2,
+          "dtstamp": "20240101T000000Z",
+          "rrule": "FREQ=WEEKLY",
+          "alarms": [
+            {
+              "component": "VALARM",
+              "action": "DISPLAY",
+              "trigger": "-PT1H"
+            }
+          ]
+        },
+        {
+          "component": "VTODO",
+          "uid": "t2"
+        }
+      ],
+      "journals": [
+        {
+          "component": "VJOURNAL",
+          "uid": "j1",
+          "summary": "Journal"
+        }
+      ],
+      "timezones": [
+        {
+          "component": "VTIMEZONE",
+          "tzid": "UTC"
+        }
+      ]
+    },
+    "toICalString": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nNAME:Calendar\r\nBEGIN:VEVENT\r\nDTSTART:20240101T120000Z\r\nUID:e\r\nSUMMARY:Meeting\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    "attendeesReplace": {
+      "component": "VEVENT",
+      "attendee": ["mailto:b@example.com"],
+      "dtstart": "1"
+    },
+    "negativePercent": {
+      "component": "VTODO",
+      "percent": 0
+    },
+    "emptyTodo": {
+      "component": "VTODO"
+    },
+    "eventWithoutStart": {
+      "thrown": "Event requires dtstart"
+    },
+    "calendarWithoutProdid": {
+      "thrown": "Calendar requires prodid"
+    },
+    "eventBuilderWithoutStartInCalendar": {
+      "thrown": "Event requires dtstart"
+    }
+  },
+  "modules": {
+    "eventEverything": {
+      "event": {
+        "component": "VEVENT",
+        "dtstart": "20240101T120000Z",
+        "uid": "e1",
+        "dtend": "20240101T130000Z",
+        "duration": "PT1H",
+        "summary": "Summary",
+        "description": "Description",
+        "location": "Location",
+        "organizer": "mailto:org@example.com",
+        "attendee": ["mailto:a@example.com", "mailto:b@example.com"],
+        "categories": ["A", "B"],
+        "status": "CANCELLED",
+        "rrule": "FREQ=DAILY",
+        "url": "https://example.com",
+        "priority": 0,
+        "class": "CONFIDENTIAL"
+      },
+      "encoded": {
+        "ok": [
+          "BEGIN:VEVENT",
+          "DTSTART:20240101T120000Z",
+          "UID:e1",
+          "DTEND:20240101T130000Z",
+          "DURATION:PT1H",
+          "SUMMARY:Summary",
+          "DESCRIPTION:Description",
+          "LOCATION:Location",
+          "ORGANIZER:mailto:org@example.com",
+          "ATTENDEE:mailto:a@example.com",
+          "ATTENDEE:mailto:b@example.com",
+          "CATEGORIES:A,B",
+          "STATUS:CANCELLED",
+          "RRULE:FREQ=DAILY",
+          "URL:https://example.com",
+          "PRIORITY:0",
+          "CLASS:CONFIDENTIAL",
+          "END:VEVENT"
+        ]
+      }
+    },
+    "eventMinimal": {
+      "ok": ["BEGIN:VEVENT", "DTSTART:20240101", "END:VEVENT"]
+    },
+    "todoEverything": {
+      "todo": {
+        "component": "VTODO",
+        "uid": "t1",
+        "dtstart": "20240101",
+        "due": "20240102",
+        "summary": "Todo",
+        "description": "Description",
+        "location": "Desk",
+        "status": "NEEDS-ACTION",
+        "percent": 100,
+        "completed": "20240102",
+        "priority": 0,
+        "rrule": "FREQ=WEEKLY"
+      },
+      "encoded": {
+        "ok": [
+          "BEGIN:VTODO",
+          "UID:t1",
+          "DTSTART:20240101",
+          "DUE:20240102",
+          "SUMMARY:Todo",
+          "DESCRIPTION:Description",
+          "LOCATION:Desk",
+          "STATUS:NEEDS-ACTION",
+          "PERCENT-COMPLETE:100",
+          "COMPLETED:20240102",
+          "PRIORITY:0",
+          "RRULE:FREQ=WEEKLY",
+          "END:VTODO"
+        ]
+      }
+    },
+    "todoNegativePercent": {
+      "component": "VTODO",
+      "percent": 0
+    },
+    "calendarDefaults": {
+      "made": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//Made//EN"
+      },
+      "built": {
+        "component": "VCALENDAR",
+        "version": "2.0",
+        "prodid": "-//effect-ical//EN"
+      }
+    },
+    "calendarEverything": {
+      "ok": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Piped//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:REQUEST\r\nNAME:Name\r\nDESCRIPTION:Description\r\nBEGIN:VEVENT\r\nDTSTART:20240101T120000Z\r\nUID:e1\r\nSUMMARY:Summary\r\nDTEND:20240101T130000Z\r\nDESCRIPTION:Desc\r\nLOCATION:Room\r\nSTATUS:CONFIRMED\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20240102\r\nEND:VEVENT\r\nBEGIN:VTODO\r\nUID:t1\r\nSUMMARY:Todo\r\nDTSTART:20240102\r\nDUE:20240103\r\nSTATUS:IN-PROCESS\r\nPERCENT-COMPLETE:0\r\nEND:VTODO\r\nBEGIN:VTODO\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
+    }
+  }
+}

@@ -1,169 +1,177 @@
 /**
- * Basic example of parsing and encoding iCalendar files
+ * The plain object model: encode a `VCalendar` with `encodeSync`, parse text
+ * back with `parse`, and round-trip a calendar.
+ *
+ * Run from the repo root with `vp run examples` (every example) or
+ * `vp exec tsx examples/basic.ts`; `vp run check` type-checks it against the
+ * current API.
  */
 
-import { parseEither, encodeSync } from "../src/index.js";
-import type { VCalendar, VEvent } from "../src/types.js";
+import * as Console from "effect/Console";
+import * as Effect from "effect/Effect";
+import { encodeSync, parse } from "../src/index.js";
+import type { VCalendar, VEvent } from "../src/index.js";
 
-console.log("=== Example 1: Creating a simple event ===\n");
+const main = Effect.fn("examples/basic")(function* () {
+  yield* Console.log("=== Example 1: Creating a simple event ===\n");
 
-// Create a simple calendar with an event
-const calendar: VCalendar = {
-  component: "VCALENDAR",
-  version: "2.0",
-  prodid: "-//Example Corp//Example App//EN",
-  calscale: "GREGORIAN",
-  events: [
-    {
-      component: "VEVENT",
-      uid: "event-001@example.com",
-      dtstamp: "20240101T000000Z",
-      dtstart: "20240115T100000Z",
-      dtend: "20240115T110000Z",
-      summary: "Team Standup",
-      description: "Daily team standup meeting",
-      location: "Conference Room A",
-      status: "CONFIRMED",
-    },
-  ],
-};
+  // Create a simple calendar with an event
+  const calendar: VCalendar = {
+    component: "VCALENDAR",
+    version: "2.0",
+    prodid: "-//Example Corp//Example App//EN",
+    calscale: "GREGORIAN",
+    events: [
+      {
+        component: "VEVENT",
+        uid: "event-001@example.com",
+        dtstamp: "20240101T000000Z",
+        dtstart: "20240115T100000Z",
+        dtend: "20240115T110000Z",
+        summary: "Team Standup",
+        description: "Daily team standup meeting",
+        location: "Conference Room A",
+        status: "CONFIRMED",
+      },
+    ],
+  };
 
-// Encode to iCal format
-const icalString = encodeSync(calendar);
-console.log("Encoded iCalendar:");
-console.log(icalString);
+  // Encode to iCal format
+  const icalString = encodeSync(calendar);
+  yield* Console.log("Encoded iCalendar:");
+  yield* Console.log(icalString);
 
-console.log("\n=== Example 2: Parsing an iCalendar string ===\n");
+  yield* Console.log("\n=== Example 2: Parsing an iCalendar string ===\n");
 
-// Parse the iCal string back
-const parseResult = parseEither(icalString);
+  // Parse the iCal string back
+  const parsed = yield* parse(icalString);
+  yield* Console.log("Successfully parsed calendar!");
+  yield* Console.log(`Product ID: ${parsed.prodid}`);
+  yield* Console.log(`Version: ${parsed.version}`);
+  yield* Console.log(`Number of events: ${parsed.events?.length ?? 0}`);
 
-if (parseResult._tag === "Right") {
-  const parsed = parseResult.right;
-  console.log("Successfully parsed calendar!");
-  console.log(`Product ID: ${parsed.prodid}`);
-  console.log(`Version: ${parsed.version}`);
-  console.log(`Number of events: ${parsed.events?.length || 0}`);
-  
-  if (parsed.events && parsed.events.length > 0) {
-    const event = parsed.events[0];
-    console.log(`\nFirst event:`);
-    console.log(`  UID: ${event.uid}`);
-    console.log(`  Summary: ${event.summary}`);
-    console.log(`  Start: ${event.dtstart}`);
-    console.log(`  Location: ${event.location}`);
+  const [first] = parsed.events ?? [];
+  if (first) {
+    yield* Console.log(`\nFirst event:`);
+    yield* Console.log(`  UID: ${first.uid}`);
+    yield* Console.log(`  Summary: ${first.summary}`);
+    yield* Console.log(`  Start: ${first.dtstart}`);
+    yield* Console.log(`  Location: ${first.location}`);
   }
-} else {
-  console.error("Failed to parse:", parseResult.left.message);
-}
 
-console.log("\n=== Example 3: Creating an event with an alarm ===\n");
+  yield* Console.log("\n=== Example 3: Creating an event with an alarm ===\n");
 
-const eventWithAlarm: VEvent = {
-  component: "VEVENT",
-  uid: "event-002@example.com",
-  dtstamp: "20240101T000000Z",
-  dtstart: "20240120T143000Z",
-  dtend: "20240120T153000Z",
-  summary: "Doctor Appointment",
-  location: "City Medical Center",
-  description: "Annual checkup",
-  status: "CONFIRMED",
-  alarms: [
-    {
-      component: "VALARM",
-      action: "DISPLAY",
-      trigger: "-PT15M", // 15 minutes before
-      description: "Reminder: Doctor appointment in 15 minutes",
-    },
-    {
-      component: "VALARM",
-      action: "DISPLAY",
-      trigger: "-P1D", // 1 day before
-      description: "Reminder: Doctor appointment tomorrow",
-    },
-  ],
-};
+  const eventWithAlarm: VEvent = {
+    component: "VEVENT",
+    uid: "event-002@example.com",
+    dtstamp: "20240101T000000Z",
+    dtstart: "20240120T143000Z",
+    dtend: "20240120T153000Z",
+    summary: "Doctor Appointment",
+    location: "City Medical Center",
+    description: "Annual checkup",
+    status: "CONFIRMED",
+    alarms: [
+      {
+        component: "VALARM",
+        action: "DISPLAY",
+        trigger: "-PT15M", // 15 minutes before
+        description: "Reminder: Doctor appointment in 15 minutes",
+      },
+      {
+        component: "VALARM",
+        action: "DISPLAY",
+        trigger: "-P1D", // 1 day before
+        description: "Reminder: Doctor appointment tomorrow",
+      },
+    ],
+  };
 
-const calendarWithAlarm: VCalendar = {
-  component: "VCALENDAR",
-  version: "2.0",
-  prodid: "-//Example Corp//Example App//EN",
-  events: [eventWithAlarm],
-};
+  const calendarWithAlarm: VCalendar = {
+    component: "VCALENDAR",
+    version: "2.0",
+    prodid: "-//Example Corp//Example App//EN",
+    events: [eventWithAlarm],
+  };
 
-const icalWithAlarm = encodeSync(calendarWithAlarm);
-console.log("Event with alarms:");
-console.log(icalWithAlarm);
+  const icalWithAlarm = encodeSync(calendarWithAlarm);
+  yield* Console.log("Event with alarms:");
+  yield* Console.log(icalWithAlarm);
 
-console.log("\n=== Example 4: Creating a todo list ===\n");
+  yield* Console.log("\n=== Example 4: Creating a todo list ===\n");
 
-const todoCalendar: VCalendar = {
-  component: "VCALENDAR",
-  version: "2.0",
-  prodid: "-//Example Corp//Example App//EN",
-  todos: [
-    {
-      component: "VTODO",
-      uid: "todo-001@example.com",
-      dtstamp: "20240101T000000Z",
-      dtstart: "20240110T090000Z",
-      due: "20240115T170000Z",
-      summary: "Complete project proposal",
-      description: "Draft and submit Q1 project proposal",
-      status: "IN-PROCESS",
-      percent: 60,
-      priority: 1,
-    },
-    {
-      component: "VTODO",
-      uid: "todo-002@example.com",
-      dtstamp: "20240101T000000Z",
-      due: "20240112T170000Z",
-      summary: "Review pull requests",
-      status: "NEEDS-ACTION",
-      priority: 2,
-    },
-  ],
-};
+  const todoCalendar: VCalendar = {
+    component: "VCALENDAR",
+    version: "2.0",
+    prodid: "-//Example Corp//Example App//EN",
+    todos: [
+      {
+        component: "VTODO",
+        uid: "todo-001@example.com",
+        dtstamp: "20240101T000000Z",
+        dtstart: "20240110T090000Z",
+        due: "20240115T170000Z",
+        summary: "Complete project proposal",
+        description: "Draft and submit Q1 project proposal",
+        status: "IN-PROCESS",
+        percent: 60,
+        priority: 1,
+      },
+      {
+        component: "VTODO",
+        uid: "todo-002@example.com",
+        dtstamp: "20240101T000000Z",
+        due: "20240112T170000Z",
+        summary: "Review pull requests",
+        status: "NEEDS-ACTION",
+        priority: 2,
+      },
+    ],
+  };
 
-const todoIcal = encodeSync(todoCalendar);
-console.log("Todo list:");
-console.log(todoIcal);
+  const todoIcal = encodeSync(todoCalendar);
+  yield* Console.log("Todo list:");
+  yield* Console.log(todoIcal);
 
-console.log("\n=== Example 5: Round-trip conversion ===\n");
+  yield* Console.log("\n=== Example 5: Round-trip conversion ===\n");
 
-const originalCal: VCalendar = {
-  component: "VCALENDAR",
-  version: "2.0",
-  prodid: "-//Example Corp//Example App//EN",
-  name: "My Calendar",
-  description: "Personal calendar",
-  events: [
-    {
-      component: "VEVENT",
-      uid: "unique-123",
-      dtstart: "20240201T120000Z",
-      dtend: "20240201T130000Z",
-      summary: "Lunch Meeting",
-      categories: ["Work", "Meeting"],
-      priority: 5,
-    },
-  ],
-};
+  const originalCal: VCalendar = {
+    component: "VCALENDAR",
+    version: "2.0",
+    prodid: "-//Example Corp//Example App//EN",
+    name: "My Calendar",
+    description: "Personal calendar",
+    events: [
+      {
+        component: "VEVENT",
+        uid: "unique-123",
+        dtstart: "20240201T120000Z",
+        dtend: "20240201T130000Z",
+        summary: "Lunch Meeting",
+        categories: ["Work", "Meeting"],
+        priority: 5,
+      },
+    ],
+  };
 
-// Encode
-const encoded = encodeSync(originalCal);
-console.log("Original calendar encoded to:");
-console.log(encoded.substring(0, 200) + "...\n");
+  // Encode
+  const encoded = encodeSync(originalCal);
+  yield* Console.log("Original calendar encoded to:");
+  yield* Console.log(encoded.substring(0, 200) + "...\n");
 
-// Parse back
-const decoded = parseEither(encoded);
-if (decoded._tag === "Right") {
-  console.log("Round-trip successful!");
-  console.log("Verification:");
-  console.log(`  Name preserved: ${decoded.right.name === originalCal.name}`);
-  console.log(`  Description preserved: ${decoded.right.description === originalCal.description}`);
-  console.log(`  Event UID preserved: ${decoded.right.events?.[0]?.uid === originalCal.events?.[0]?.uid}`);
-  console.log(`  Event summary preserved: ${decoded.right.events?.[0]?.summary === originalCal.events?.[0]?.summary}`);
-}
+  // Parse back
+  const decoded = yield* parse(encoded);
+  yield* Console.log("Round-trip successful!");
+  yield* Console.log("Verification:");
+  yield* Console.log(`  Name preserved: ${decoded.name === originalCal.name}`);
+  yield* Console.log(`  Description preserved: ${decoded.description === originalCal.description}`);
+  yield* Console.log(
+    `  Event UID preserved: ${decoded.events?.[0]?.uid === originalCal.events?.[0]?.uid}`,
+  );
+  yield* Console.log(
+    `  Event summary preserved: ${decoded.events?.[0]?.summary === originalCal.events?.[0]?.summary}`,
+  );
+});
+
+// The entrypoint: the one place this script runs an Effect.
+Effect.runPromise(main());

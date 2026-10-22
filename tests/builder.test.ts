@@ -2,9 +2,10 @@
  * Tests for the builder API
  */
 
-import { describe, it, expect } from "bun:test";
+import { assert, describe, expect, it } from "vite-plus/test";
+import * as Result from "effect/Result";
 import { createCalendar, createEvent, createTodo, CalendarBuilder } from "../src/builder";
-import { parseEither } from "../src/parser";
+import { parseResult } from "../src/parser";
 
 describe("Builder API", () => {
   describe("CalendarBuilder", () => {
@@ -24,18 +25,9 @@ describe("Builder API", () => {
     it("should create a calendar with events", () => {
       const calendar = createCalendar("-//Test//Test//EN")
         .event((e) =>
-          e
-            .uid("event1")
-            .dtstart("20240101T120000Z")
-            .dtend("20240101T130000Z")
-            .summary("Meeting")
+          e.uid("event1").dtstart("20240101T120000Z").dtend("20240101T130000Z").summary("Meeting"),
         )
-        .event((e) =>
-          e
-            .uid("event2")
-            .dtstart("20240102T140000Z")
-            .summary("Another Meeting")
-        )
+        .event((e) => e.uid("event2").dtstart("20240102T140000Z").summary("Another Meeting"))
         .build();
 
       expect(calendar.events?.length).toBe(2);
@@ -45,13 +37,7 @@ describe("Builder API", () => {
 
     it("should create a calendar with todos", () => {
       const calendar = createCalendar("-//Test//Test//EN")
-        .todo((t) =>
-          t
-            .uid("todo1")
-            .summary("Complete task")
-            .status("NEEDS-ACTION")
-            .priority(1)
-        )
+        .todo((t) => t.uid("todo1").summary("Complete task").status("NEEDS-ACTION").priority(1))
         .build();
 
       expect(calendar.todos?.length).toBe(1);
@@ -62,12 +48,7 @@ describe("Builder API", () => {
     it("should encode calendar to iCal string", () => {
       const icalString = createCalendar("-//Test//Test//EN")
         .name("My Calendar")
-        .event((e) =>
-          e
-            .uid("test-event")
-            .dtstart("20240101T120000Z")
-            .summary("Test Event")
-        )
+        .event((e) => e.uid("test-event").dtstart("20240101T120000Z").summary("Test Event"))
         .toICalString();
 
       expect(icalString).toContain("BEGIN:VCALENDAR");
@@ -174,10 +155,7 @@ describe("Builder API", () => {
     });
 
     it("should set percent complete", () => {
-      const todo = createTodo()
-        .summary("Task")
-        .percentComplete(50)
-        .build();
+      const todo = createTodo().summary("Task").percentComplete(50).build();
 
       expect(todo.percent).toBe(50);
     });
@@ -218,40 +196,33 @@ describe("Builder API", () => {
             .description("Weekly sync")
             .location("Office")
             .status("CONFIRMED")
-            .priority(5)
+            .priority(5),
         )
         .todo((t) =>
-          t
-            .uid("todo-456")
-            .summary("Review PR")
-            .status("IN-PROCESS")
-            .percentComplete(75)
+          t.uid("todo-456").summary("Review PR").status("IN-PROCESS").percentComplete(75),
         )
         .toICalString();
 
-      const result = parseEither(icalString);
-      expect(result._tag).toBe("Right");
+      const result = parseResult(icalString);
+      assert(Result.isSuccess(result));
+      const calendar = result.success;
+      expect(calendar.prodid).toBe("-//Test//Test//EN");
+      expect(calendar.name).toBe("Test Calendar");
+      expect(calendar.calscale).toBe("GREGORIAN");
 
-      if (result._tag === "Right") {
-        const calendar = result.right;
-        expect(calendar.prodid).toBe("-//Test//Test//EN");
-        expect(calendar.name).toBe("Test Calendar");
-        expect(calendar.calscale).toBe("GREGORIAN");
+      expect(calendar.events?.length).toBe(1);
+      const event = calendar.events?.[0];
+      expect(event?.uid).toBe("event-123");
+      expect(event?.summary).toBe("Team Meeting");
+      expect(event?.description).toBe("Weekly sync");
+      expect(event?.status).toBe("CONFIRMED");
 
-        expect(calendar.events?.length).toBe(1);
-        const event = calendar.events?.[0];
-        expect(event?.uid).toBe("event-123");
-        expect(event?.summary).toBe("Team Meeting");
-        expect(event?.description).toBe("Weekly sync");
-        expect(event?.status).toBe("CONFIRMED");
-
-        expect(calendar.todos?.length).toBe(1);
-        const todo = calendar.todos?.[0];
-        expect(todo?.uid).toBe("todo-456");
-        expect(todo?.summary).toBe("Review PR");
-        expect(todo?.status).toBe("IN-PROCESS");
-        expect(todo?.percent).toBe(75);
-      }
+      expect(calendar.todos?.length).toBe(1);
+      const todo = calendar.todos?.[0];
+      expect(todo?.uid).toBe("todo-456");
+      expect(todo?.summary).toBe("Review PR");
+      expect(todo?.status).toBe("IN-PROCESS");
+      expect(todo?.percent).toBe(75);
     });
   });
 

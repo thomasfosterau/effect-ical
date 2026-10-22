@@ -1,12 +1,33 @@
 /**
- * Calendar module - Effect-style API for iCalendar (VCALENDAR) components
+ * Pipeable constructors, setters and a codec for iCalendar `VCALENDAR`
+ * objects, as an Effect Schema class.
+ *
+ * Start from `Calendar.builder()` (or `Calendar.make(prodid)`), pipe setters
+ * (`Calendar.withName`, `Calendar.withEvent`, …) and finish with
+ * `Calendar.build`. `Calendar.encode` renders the calendar with its events
+ * and to-dos; `Calendar.decode` reads back its top-level properties.
+ *
+ * @module
  */
 
-import { Effect } from "effect";
+import * as Arr from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Record from "effect/Record";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as Str from "effect/String";
+import { Event } from "./Event.js";
+import { ParseError } from "./parser.js";
+import { Todo } from "./Todo.js";
 
 /**
- * Calendar Schema - represents a VCALENDAR component
+ * A `VCALENDAR` object: its top-level properties and its components.
+ *
+ * `events` and `todos` hold {@link Event} and {@link Todo} values; the other
+ * component lists are carried untyped and are not written by `encode`.
+ *
+ * @category models
  */
 export class Calendar extends Schema.Class<Calendar>("Calendar")({
   component: Schema.Literal("VCALENDAR"),
@@ -16,9 +37,8 @@ export class Calendar extends Schema.Class<Calendar>("Calendar")({
   method: Schema.optional(Schema.String),
   name: Schema.optional(Schema.String),
   description: Schema.optional(Schema.String),
-  // Forward references for sub-components - will be filled in after Event/Todo are defined
-  events: Schema.optional(Schema.Array(Schema.Any)),
-  todos: Schema.optional(Schema.Array(Schema.Any)),
+  events: Schema.optional(Schema.Array(Event)),
+  todos: Schema.optional(Schema.Array(Todo)),
   journals: Schema.optional(Schema.Array(Schema.Any)),
   freebusys: Schema.optional(Schema.Array(Schema.Any)),
   timezones: Schema.optional(Schema.Array(Schema.Any)),
@@ -52,64 +72,78 @@ export const builder = (): Builder => ({
 /**
  * Set the product ID
  */
-export const withProdid = (prodid: string) => (builder: Builder): Builder => ({
-  ...builder,
-  calendar: { ...builder.calendar, prodid },
-});
+export const withProdid =
+  (prodid: string) =>
+  (builder: Builder): Builder => ({
+    ...builder,
+    calendar: { ...builder.calendar, prodid },
+  });
 
 /**
  * Set the calendar name
  */
-export const withName = (name: string) => (builder: Builder): Builder => ({
-  ...builder,
-  calendar: { ...builder.calendar, name },
-});
+export const withName =
+  (name: string) =>
+  (builder: Builder): Builder => ({
+    ...builder,
+    calendar: { ...builder.calendar, name },
+  });
 
 /**
  * Set the calendar description
  */
-export const withDescription = (description: string) => (builder: Builder): Builder => ({
-  ...builder,
-  calendar: { ...builder.calendar, description },
-});
+export const withDescription =
+  (description: string) =>
+  (builder: Builder): Builder => ({
+    ...builder,
+    calendar: { ...builder.calendar, description },
+  });
 
 /**
  * Set the calendar scale
  */
-export const withCalscale = (calscale: "GREGORIAN") => (builder: Builder): Builder => ({
-  ...builder,
-  calendar: { ...builder.calendar, calscale },
-});
+export const withCalscale =
+  (calscale: "GREGORIAN") =>
+  (builder: Builder): Builder => ({
+    ...builder,
+    calendar: { ...builder.calendar, calscale },
+  });
 
 /**
  * Set the method
  */
-export const withMethod = (method: string) => (builder: Builder): Builder => ({
-  ...builder,
-  calendar: { ...builder.calendar, method },
-});
+export const withMethod =
+  (method: string) =>
+  (builder: Builder): Builder => ({
+    ...builder,
+    calendar: { ...builder.calendar, method },
+  });
 
 /**
  * Add an event to the calendar
  */
-export const withEvent = (event: any) => (builder: Builder): Builder => ({
-  ...builder,
-  calendar: {
-    ...builder.calendar,
-    events: [...(builder.calendar.events || []), event],
-  },
-});
+export const withEvent =
+  (event: Event) =>
+  (builder: Builder): Builder => ({
+    ...builder,
+    calendar: {
+      ...builder.calendar,
+      events: [...(builder.calendar.events || []), event],
+    },
+  });
 
 /**
  * Add a todo to the calendar
  */
-export const withTodo = (todo: any) => (builder: Builder): Builder => ({
-  ...builder,
-  calendar: {
-    ...builder.calendar,
-    todos: [...(builder.calendar.todos || []), todo],
-  },
-});
+export const withTodo =
+  (todo: Todo) =>
+  (builder: Builder): Builder => ({
+    ...builder,
+    calendar: {
+      ...builder.calendar,
+      todos: [...(builder.calendar.todos || []), todo],
+    },
+  });
 
 /**
  * Build the final calendar from builder
@@ -117,109 +151,109 @@ export const withTodo = (todo: any) => (builder: Builder): Builder => ({
 export const build = (builder: Builder): Calendar => builder.calendar;
 
 /**
- * Encode a calendar to iCal format string
+ * Render a calendar as iCalendar text: its top-level properties, then each
+ * event (`DTSTART`, `UID`, `SUMMARY`, `DTEND`, `DESCRIPTION`, `LOCATION`,
+ * `STATUS`) and each to-do (`UID`, `SUMMARY`, `DTSTART`, `DUE`, `STATUS`,
+ * `PERCENT-COMPLETE`), with CRLF line endings.
+ *
+ * A compact rendering: values are written verbatim (no escaping or line
+ * folding) and other event and to-do properties are not written. For the
+ * complete RFC 5545 encoder, use `encode` from the package root on a
+ * `VCalendar`.
+ *
+ * @category encoding
  */
-export const encode = (calendar: Calendar): Effect.Effect<string, Error> => {
-  return Effect.gen(function* () {
-    const lines: string[] = [];
-
-    lines.push("BEGIN:VCALENDAR");
-    lines.push(`VERSION:${calendar.version}`);
-    lines.push(`PRODID:${calendar.prodid}`);
-
-    if (calendar.calscale) {
-      lines.push(`CALSCALE:${calendar.calscale}`);
-    }
-    if (calendar.method) {
-      lines.push(`METHOD:${calendar.method}`);
-    }
-    if (calendar.name) {
-      lines.push(`NAME:${calendar.name}`);
-    }
-    if (calendar.description) {
-      lines.push(`DESCRIPTION:${calendar.description}`);
-    }
-
-    // Encode events using Event module (circular dependency handled at runtime)
-    if (calendar.events) {
-      for (const event of calendar.events) {
-        // Simple encoding for now - full Event.encode integration later
-        lines.push("BEGIN:VEVENT");
-        lines.push(`DTSTART:${(event as any).dtstart || ""}`);
-        if ((event as any).uid) lines.push(`UID:${(event as any).uid}`);
-        if ((event as any).summary) lines.push(`SUMMARY:${(event as any).summary}`);
-        if ((event as any).dtend) lines.push(`DTEND:${(event as any).dtend}`);
-        if ((event as any).description)
-          lines.push(`DESCRIPTION:${(event as any).description}`);
-        if ((event as any).location) lines.push(`LOCATION:${(event as any).location}`);
-        if ((event as any).status) lines.push(`STATUS:${(event as any).status}`);
-        lines.push("END:VEVENT");
-      }
-    }
-
-    // Encode todos
-    if (calendar.todos) {
-      for (const todo of calendar.todos) {
-        lines.push("BEGIN:VTODO");
-        if ((todo as any).uid) lines.push(`UID:${(todo as any).uid}`);
-        if ((todo as any).summary) lines.push(`SUMMARY:${(todo as any).summary}`);
-        if ((todo as any).dtstart) lines.push(`DTSTART:${(todo as any).dtstart}`);
-        if ((todo as any).due) lines.push(`DUE:${(todo as any).due}`);
-        if ((todo as any).status) lines.push(`STATUS:${(todo as any).status}`);
-        if ((todo as any).percent !== undefined)
-          lines.push(`PERCENT-COMPLETE:${(todo as any).percent}`);
-        lines.push("END:VTODO");
-      }
-    }
-
-    lines.push("END:VCALENDAR");
-
-    return lines.join("\r\n") + "\r\n";
+export const encode = (calendar: Calendar): Effect.Effect<string> =>
+  Effect.sync(() => {
+    const lines = [
+      "BEGIN:VCALENDAR",
+      `VERSION:${calendar.version}`,
+      `PRODID:${calendar.prodid}`,
+      ...(calendar.calscale ? [`CALSCALE:${calendar.calscale}`] : []),
+      ...(calendar.method ? [`METHOD:${calendar.method}`] : []),
+      ...(calendar.name ? [`NAME:${calendar.name}`] : []),
+      ...(calendar.description ? [`DESCRIPTION:${calendar.description}`] : []),
+      ...Arr.flatMap(calendar.events ?? [], (event) => [
+        "BEGIN:VEVENT",
+        `DTSTART:${event.dtstart || ""}`,
+        ...(event.uid ? [`UID:${event.uid}`] : []),
+        ...(event.summary ? [`SUMMARY:${event.summary}`] : []),
+        ...(event.dtend ? [`DTEND:${event.dtend}`] : []),
+        ...(event.description ? [`DESCRIPTION:${event.description}`] : []),
+        ...(event.location ? [`LOCATION:${event.location}`] : []),
+        ...(event.status ? [`STATUS:${event.status}`] : []),
+        "END:VEVENT",
+      ]),
+      ...Arr.flatMap(calendar.todos ?? [], (todo) => [
+        "BEGIN:VTODO",
+        ...(todo.uid ? [`UID:${todo.uid}`] : []),
+        ...(todo.summary ? [`SUMMARY:${todo.summary}`] : []),
+        ...(todo.dtstart ? [`DTSTART:${todo.dtstart}`] : []),
+        ...(todo.due ? [`DUE:${todo.due}`] : []),
+        ...(todo.status ? [`STATUS:${todo.status}`] : []),
+        ...(todo.percent === undefined ? [] : [`PERCENT-COMPLETE:${todo.percent}`]),
+        "END:VTODO",
+      ]),
+      "END:VCALENDAR",
+    ];
+    return Arr.join(lines, "\r\n") + "\r\n";
   });
-};
+
+/** The top-level calendar properties `decode` reads. */
+const decodedProperties = [
+  "PRODID",
+  "VERSION",
+  "NAME",
+  "DESCRIPTION",
+  "CALSCALE",
+  "METHOD",
+] as const;
 
 /**
- * Decode an iCal string to a Calendar
+ * Read a calendar's top-level properties (`PRODID`, `VERSION`, `NAME`,
+ * `DESCRIPTION`, `CALSCALE`, `METHOD`) from iCalendar text, failing with a
+ * `ParseError` when `PRODID` is missing or `VERSION` is not `2.0`.
+ *
+ * A shallow reader: it does not unfold lines or descend into components, so
+ * the returned calendar has no events or to-dos, and a property line inside a
+ * component counts as the calendar's own (the last occurrence wins). For a
+ * full parse, use `parse` from the package root.
+ *
+ * @category decoding
  */
-export const decode = (icalString: string): Effect.Effect<Calendar, Error> => {
-  return Effect.gen(function* () {
-    // Simple parser for now - will be enhanced with full Schema decoding
-    const lines = icalString.split(/\r?\n/).filter((l) => l.trim());
-
-    let prodid = "";
-    let version: "2.0" = "2.0";
-    let name: string | undefined;
-    let description: string | undefined;
-    let calscale: "GREGORIAN" | undefined;
-    let method: string | undefined;
-
-    for (const line of lines) {
-      const [key, ...valueParts] = line.split(":");
-      const value = valueParts.join(":");
-
-      if (key === "PRODID") prodid = value;
-      else if (key === "VERSION") version = value as "2.0";
-      else if (key === "NAME") name = value;
-      else if (key === "DESCRIPTION") description = value;
-      else if (key === "CALSCALE") calscale = value as "GREGORIAN";
-      else if (key === "METHOD") method = value;
-    }
-
+export const decode = (icalString: string): Effect.Effect<Calendar, ParseError> =>
+  Effect.suspend(() => {
+    const properties = Record.fromEntries(
+      Arr.filterMap(
+        Arr.filter(icalString.split(/\r?\n/), (line) => Str.isNonEmpty(line.trim())),
+        (line) => {
+          const [key = "", ...valueParts] = line.split(":");
+          return Arr.contains(decodedProperties, key)
+            ? Result.succeed([key, Arr.join(valueParts, ":")] as const)
+            : Result.failVoid;
+        },
+      ),
+    );
+    const property = (key: (typeof decodedProperties)[number]) => Record.get(properties, key);
+    const prodid = Option.getOrElse(property("PRODID"), () => "");
+    const version = Option.getOrElse(property("VERSION"), () => "2.0");
     if (!prodid) {
-      return yield* Effect.fail(new Error("PRODID is required"));
+      return Effect.fail(new ParseError({ message: "PRODID is required" }));
     }
     if (version !== "2.0") {
-      return yield* Effect.fail(new Error("VERSION must be 2.0"));
+      return Effect.fail(new ParseError({ message: "VERSION must be 2.0" }));
     }
-
-    return new Calendar({
-      component: "VCALENDAR",
-      version,
-      prodid,
-      calscale,
-      method,
-      name,
-      description,
-    });
+    // Decoding (not `new Calendar`) because CALSCALE is read as free text: a
+    // value other than GREGORIAN is a defect, as it always has been.
+    return Effect.orDie(
+      Schema.decodeUnknownEffect(Calendar)({
+        component: "VCALENDAR",
+        version,
+        prodid,
+        calscale: Option.getOrUndefined(property("CALSCALE")),
+        method: Option.getOrUndefined(property("METHOD")),
+        name: Option.getOrUndefined(property("NAME")),
+        description: Option.getOrUndefined(property("DESCRIPTION")),
+      }),
+    );
   });
-};

@@ -2,8 +2,9 @@
  * Tests for the Effect-style API
  */
 
-import { describe, it, expect } from "bun:test";
-import { Effect, pipe } from "effect";
+import { describe, it, expect } from "vite-plus/test";
+import { pipe } from "effect/Function";
+import { runTest } from "./helpers/effect.ts";
 import * as Calendar from "../src/Calendar";
 import * as Event from "../src/Event";
 import * as Todo from "../src/Todo";
@@ -20,7 +21,7 @@ describe("Effect-style API", () => {
 
     it("should encode a calendar with Calendar.encode()", async () => {
       const calendar = Calendar.make("-//Test//Test//EN");
-      const encoded = await Effect.runPromise(Calendar.encode(calendar));
+      const encoded = await runTest(Calendar.encode(calendar));
 
       expect(encoded).toContain("BEGIN:VCALENDAR");
       expect(encoded).toContain("VERSION:2.0");
@@ -34,7 +35,7 @@ describe("Effect-style API", () => {
         Calendar.withProdid("-//My Company//My App//EN"),
         Calendar.withName("My Calendar"),
         Calendar.withDescription("Test calendar"),
-        Calendar.build
+        Calendar.build,
       );
 
       expect(calendar.prodid).toBe("-//My Company//My App//EN");
@@ -49,7 +50,7 @@ describe("Effect-style API", () => {
         Calendar.builder(),
         Calendar.withProdid("-//Test//EN"),
         Calendar.withEvent(event),
-        Calendar.build
+        Calendar.build,
       );
 
       expect(calendar.events?.length).toBe(1);
@@ -62,7 +63,7 @@ describe("Effect-style API", () => {
         Calendar.builder(),
         Calendar.withProdid("-//Test//EN"),
         Calendar.withTodo(todo),
-        Calendar.build
+        Calendar.build,
       );
 
       expect(calendar.todos?.length).toBe(1);
@@ -84,7 +85,7 @@ describe("Effect-style API", () => {
         Event.withSummary("Team Meeting"),
         Event.withDescription("Weekly sync"),
         Event.withLocation("Office"),
-        Event.withStatus("CONFIRMED")
+        Event.withStatus("CONFIRMED"),
       );
 
       expect(event.uid).toBe("event123");
@@ -98,10 +99,10 @@ describe("Effect-style API", () => {
       const event = pipe(
         Event.make("20240101T120000Z"),
         Event.withUid("event123"),
-        Event.withSummary("Meeting")
+        Event.withSummary("Meeting"),
       );
 
-      const lines = await Effect.runPromise(Event.encode(event));
+      const lines = await runTest(Event.encode(event));
 
       expect(lines).toContain("BEGIN:VEVENT");
       expect(lines).toContain("DTSTART:20240101T120000Z");
@@ -125,7 +126,7 @@ describe("Effect-style API", () => {
         Todo.withSummary("Complete task"),
         Todo.withStatus("IN-PROCESS"),
         Todo.withPercent(50),
-        Todo.withPriority(1)
+        Todo.withPriority(1),
       );
 
       expect(todo.uid).toBe("todo123");
@@ -140,10 +141,10 @@ describe("Effect-style API", () => {
         Todo.make(),
         Todo.withUid("todo123"),
         Todo.withSummary("Task"),
-        Todo.withPercent(75)
+        Todo.withPercent(75),
       );
 
-      const lines = await Effect.runPromise(Todo.encode(todo));
+      const lines = await runTest(Todo.encode(todo));
 
       expect(lines).toContain("BEGIN:VTODO");
       expect(lines).toContain("UID:todo123");
@@ -161,7 +162,7 @@ describe("Effect-style API", () => {
         Event.withSummary("Team Standup"),
         Event.withDtend("20240115T110000Z"),
         Event.withLocation("Conference Room A"),
-        Event.withStatus("CONFIRMED")
+        Event.withStatus("CONFIRMED"),
       );
 
       const todo = pipe(
@@ -170,7 +171,7 @@ describe("Effect-style API", () => {
         Todo.withSummary("Complete proposal"),
         Todo.withDue("20240120T170000Z"),
         Todo.withStatus("IN-PROCESS"),
-        Todo.withPercent(60)
+        Todo.withPercent(60),
       );
 
       const calendar = pipe(
@@ -179,10 +180,10 @@ describe("Effect-style API", () => {
         Calendar.withName("Work Calendar"),
         Calendar.withEvent(event),
         Calendar.withTodo(todo),
-        Calendar.build
+        Calendar.build,
       );
 
-      const encoded = await Effect.runPromise(Calendar.encode(calendar));
+      const encoded = await runTest(Calendar.encode(calendar));
 
       expect(encoded).toContain("BEGIN:VCALENDAR");
       expect(encoded).toContain("PRODID:-//My Company//My App//EN");

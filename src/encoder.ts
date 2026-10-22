@@ -1,487 +1,313 @@
 /**
- * Encoder for iCalendar format (RFC 5545) using Effect idioms
+ * Encode the plain {@link Types.VCalendar} object model as iCalendar
+ * (RFC 5545) text.
+ *
+ * Output uses CRLF line endings and folds every content line longer than 75
+ * octets (UTF-8) onto continuation lines. Text-valued properties (`SUMMARY`,
+ * `DESCRIPTION`, `LOCATION`, `NAME`) are escaped; every other value is written
+ * verbatim. Optional string properties that are empty are omitted.
+ *
+ * @module
  */
 
-import { Effect } from "effect";
+import * as Arr from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Record from "effect/Record";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import type * as Types from "./types.js";
 
 /**
- * Encode errors
+ * The encoder's failure: the calendar lacks its required `version` or
+ * `prodid`. `message` says which.
+ *
+ * @category errors
  */
-export class EncodeError {
-  readonly _tag = "EncodeError";
-  constructor(readonly message: string) {}
+export class EncodeError extends Schema.TaggedError<EncodeError>()("EncodeError", {
+  message: Schema.String,
+}) {}
+
+/** UTF-8 length of one code point (a lone surrogate encodes as U+FFFD: 3 octets). */
+const utf8Length = (char: string): number => {
+  const codePoint = char.codePointAt(0) ?? 0;
+  return codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
+};
+
+/** Octets on the first physical line; continuation lines carry one fewer after their leading space. */
+const firstLineOctets = 75;
+const continuationOctets = 74;
+
+interface FoldState {
+  readonly segment: number;
+  readonly octets: number;
 }
 
 /**
- * Fold lines according to RFC 5545 (3.1)
- * Lines should be no longer than 75 octets (excluding CRLF)
- * Uses UTF-8 byte length for proper RFC compliance
+ * Fold a content line according to RFC 5545 §3.1: no physical line longer
+ * than 75 octets (UTF-8), continuation lines starting with a space, and never
+ * splitting a code point.
  */
 const foldLine = (line: string): string => {
-  const textEncoder = new TextEncoder();
-  const lineBytes = textEncoder.encode(line);
-  
-  // If the line fits within 75 octets, return as-is
-  if (lineBytes.length <= 75) {
+  const chars = Array.from(line);
+  const lengths = Arr.map(chars, utf8Length);
+  if (Arr.reduce(lengths, 0, (total, length) => total + length) <= firstLineOctets) {
     return line;
   }
+  const states = Arr.drop(
+    Arr.scan(lengths, { segment: 0, octets: 0 }, (state: FoldState, length): FoldState => {
+      const limit = state.segment === 0 ? firstLineOctets : continuationOctets;
+      return state.octets + length > limit
+        ? { segment: state.segment + 1, octets: length }
+        : { segment: state.segment, octets: state.octets + length };
+    }),
+    1,
+  );
+  const segments = Arr.groupBy(Arr.zip(chars, states), ([, state]) => String(state.segment));
+  return Arr.join(
+    Arr.map(
+      Record.values(segments),
+      (segment, index) =>
+        (index === 0 ? "" : " ") +
+        Arr.join(
+          Arr.map(segment, ([char]) => char),
+          "",
+        ),
+    ),
+    "\r\n",
+  );
+};
 
-  const lines: string[] = [];
-  let currentLine = "";
-  let currentBytes = 0;
-  let firstLine = true;
-  let maxBytesForCurrentLine = 75; // 75 octets for the first line
+/** Escape the characters RFC 5545 §3.3.11 reserves in TEXT values. */
+const escapeValue = (value: string): string =>
+  value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 
-  for (const ch of line) {
-    const byteLen = textEncoder.encode(ch).length;
+/** Format (and fold) a content line: `NAME[;PARAM=VALUE]*:VALUE`. */
+const formatContentLine = (
+  name: string,
+  value: string,
+  params: Readonly<Record<string, string>> = {},
+): string =>
+  foldLine(
+    name.toUpperCase() +
+      Arr.join(
+        Arr.map(Record.toEntries(params), ([key, param]) => `;${key.toUpperCase()}=${param}`),
+        "",
+      ) +
+      `:${value}`,
+  );
 
-    if (currentBytes + byteLen > maxBytesForCurrentLine) {
-      // Flush the current line and start a new one
-      if (firstLine) {
-        lines.push(currentLine);
-        firstLine = false;
-        maxBytesForCurrentLine = 74; // payload bytes for continuation lines (75 - 1 for leading space)
-      } else {
-        lines.push(" " + currentLine);
-      }
+/** A property line when `value` is a non-empty string, otherwise nothing. */
+const optional = (name: string, value?: string): ReadonlyArray<string> =>
+  value ? [formatContentLine(name, value)] : [];
 
-      currentLine = ch;
-      currentBytes = byteLen;
-    } else {
-      currentLine += ch;
-      currentBytes += byteLen;
-    }
+/** An escaped TEXT property line when `value` is a non-empty string, otherwise nothing. */
+const optionalText = (name: string, value?: string): ReadonlyArray<string> =>
+  value ? [formatContentLine(name, escapeValue(value))] : [];
+
+/** A property line when `value` is a number (zero included), otherwise nothing. */
+const optionalNumber = (name: string, value?: number): ReadonlyArray<string> =>
+  value === undefined ? [] : [formatContentLine(name, value.toString())];
+
+/** One property line per value, in order. */
+const each = (name: string, values: ReadonlyArray<string> = []): ReadonlyArray<string> =>
+  Arr.map(values, (value) => formatContentLine(name, value));
+
+/** `BEGIN:<name>`, the body, `END:<name>`. */
+const block = (name: string, body: ReadonlyArray<ReadonlyArray<string>>): ReadonlyArray<string> => [
+  `BEGIN:${name}`,
+  ...Arr.flatten(body),
+  `END:${name}`,
+];
+
+const encodeAlarm = (alarm: Types.VAlarm): ReadonlyArray<string> =>
+  block("VALARM", [
+    [formatContentLine("ACTION", alarm.action), formatContentLine("TRIGGER", alarm.trigger)],
+    optional("DURATION", alarm.duration),
+    optionalNumber("REPEAT", alarm.repeat),
+    optionalText("DESCRIPTION", alarm.description),
+    optionalText("SUMMARY", alarm.summary),
+    each("ATTENDEE", alarm.attendee),
+    optional("ATTACH", alarm.attach),
+  ]);
+
+const encodeAlarms = (alarms: ReadonlyArray<Types.VAlarm> = []): ReadonlyArray<string> =>
+  Arr.flatMap(alarms, encodeAlarm);
+
+const encodeEvent = (event: Types.VEvent): ReadonlyArray<string> =>
+  block("VEVENT", [
+    // DTSTART is required by RFC 5545.
+    [formatContentLine("DTSTART", event.dtstart)],
+    optional("UID", event.uid),
+    optional("DTSTAMP", event.dtstamp),
+    optional("DTEND", event.dtend),
+    optional("DURATION", event.duration),
+    optionalText("SUMMARY", event.summary),
+    optionalText("DESCRIPTION", event.description),
+    optionalText("LOCATION", event.location),
+    optional("ORGANIZER", event.organizer),
+    each("ATTENDEE", event.attendee),
+    event.categories ? [formatContentLine("CATEGORIES", Arr.join(event.categories, ","))] : [],
+    optional("STATUS", event.status),
+    optional("RRULE", event.rrule),
+    each("RDATE", event.rdate),
+    each("EXDATE", event.exdate),
+    optional("URL", event.url),
+    event.geo ? [formatContentLine("GEO", `${event.geo.lat};${event.geo.lon}`)] : [],
+    optionalNumber("PRIORITY", event.priority),
+    optional("CLASS", event.class),
+    encodeAlarms(event.alarms),
+  ]);
+
+const encodeTodo = (todo: Types.VTodo): ReadonlyArray<string> =>
+  block("VTODO", [
+    optional("UID", todo.uid),
+    optional("DTSTAMP", todo.dtstamp),
+    optional("DTSTART", todo.dtstart),
+    optional("DUE", todo.due),
+    optional("DURATION", todo.duration),
+    optionalText("SUMMARY", todo.summary),
+    optionalText("DESCRIPTION", todo.description),
+    optionalText("LOCATION", todo.location),
+    optional("STATUS", todo.status),
+    optionalNumber("PERCENT-COMPLETE", todo.percent),
+    optional("COMPLETED", todo.completed),
+    optionalNumber("PRIORITY", todo.priority),
+    optional("RRULE", todo.rrule),
+    encodeAlarms(todo.alarms),
+  ]);
+
+const encodeJournal = (journal: Types.VJournal): ReadonlyArray<string> =>
+  block("VJOURNAL", [
+    optional("UID", journal.uid),
+    optional("DTSTAMP", journal.dtstamp),
+    optional("DTSTART", journal.dtstart),
+    optionalText("SUMMARY", journal.summary),
+    optionalText("DESCRIPTION", journal.description),
+    optional("STATUS", journal.status),
+    optional("CLASS", journal.class),
+  ]);
+
+const encodeFreeBusy = (freebusy: Types.VFreeBusy): ReadonlyArray<string> =>
+  block("VFREEBUSY", [
+    optional("UID", freebusy.uid),
+    optional("DTSTAMP", freebusy.dtstamp),
+    // DTSTART and DTEND are required by RFC 5545.
+    [formatContentLine("DTSTART", freebusy.dtstart), formatContentLine("DTEND", freebusy.dtend)],
+    optional("ORGANIZER", freebusy.organizer),
+    optional("URL", freebusy.url),
+    each("ATTENDEE", freebusy.attendee),
+    Arr.map(freebusy.freebusy ?? [], (entry) =>
+      formatContentLine(
+        "FREEBUSY",
+        Arr.join(
+          Arr.map(entry.periods, (period) => `${period.start}/${period.end}`),
+          ",",
+        ),
+        entry.type ? { FBTYPE: entry.type } : {},
+      ),
+    ),
+  ]);
+
+type Observance = NonNullable<Types.VTimezone["standard"]>[number];
+
+const encodeObservance =
+  (name: "STANDARD" | "DAYLIGHT") =>
+  (observance: Observance): ReadonlyArray<string> =>
+    block(name, [
+      [
+        formatContentLine("DTSTART", observance.dtstart),
+        formatContentLine("TZOFFSETFROM", observance.tzoffsetfrom),
+        formatContentLine("TZOFFSETTO", observance.tzoffsetto),
+      ],
+      optional("RRULE", observance.rrule),
+      optional("TZNAME", observance.tzname),
+    ]);
+
+const encodeTimezone = (timezone: Types.VTimezone): ReadonlyArray<string> =>
+  block("VTIMEZONE", [
+    // TZID is required by RFC 5545.
+    [formatContentLine("TZID", timezone.tzid)],
+    optional("LAST-MODIFIED", timezone.lastmod),
+    optional("TZURL", timezone.tzurl),
+    Arr.flatMap(timezone.standard ?? [], encodeObservance("STANDARD")),
+    Arr.flatMap(timezone.daylight ?? [], encodeObservance("DAYLIGHT")),
+  ]);
+
+/**
+ * Encode a {@link Types.VCalendar} as iCalendar text, synchronously.
+ *
+ * Fails when `version` or `prodid` is missing or empty (possible only for a
+ * value that bypassed the types). Components are written in a fixed order:
+ * timezones, events, todos, journals, then free/busy.
+ *
+ * @example
+ * ```ts
+ * import { encodeResult } from "@thomasfosterau/effect-ical"
+ * import * as Result from "effect/Result"
+ *
+ * const result = encodeResult({ component: "VCALENDAR", version: "2.0", prodid: "-//Example//EN" })
+ * console.log(Result.getOrElse(result, () => "")) // "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n..."
+ * ```
+ *
+ * @category encoding
+ */
+export const encodeResult = (calendar: Types.VCalendar): Result.Result<string, EncodeError> => {
+  if (!calendar.version) {
+    return Result.fail(new EncodeError({ message: "VERSION property is required" }));
   }
-
-  // Push the final line
-  if (currentLine.length > 0) {
-    if (firstLine) {
-      lines.push(currentLine);
-    } else {
-      lines.push(" " + currentLine);
-    }
+  if (!calendar.prodid) {
+    return Result.fail(new EncodeError({ message: "PRODID property is required" }));
   }
-
-  return lines.join("\r\n");
+  const lines = block("VCALENDAR", [
+    [formatContentLine("VERSION", calendar.version), formatContentLine("PRODID", calendar.prodid)],
+    optional("CALSCALE", calendar.calscale),
+    optional("METHOD", calendar.method),
+    optionalText("NAME", calendar.name),
+    optionalText("DESCRIPTION", calendar.description),
+    Arr.flatMap(calendar.timezones ?? [], encodeTimezone),
+    Arr.flatMap(calendar.events ?? [], encodeEvent),
+    Arr.flatMap(calendar.todos ?? [], encodeTodo),
+    Arr.flatMap(calendar.journals ?? [], encodeJournal),
+    Arr.flatMap(calendar.freebusys ?? [], encodeFreeBusy),
+  ]);
+  return Result.succeed(Arr.join(lines, "\r\n") + "\r\n");
 };
 
 /**
- * Escape special characters in text values
+ * Encode a {@link Types.VCalendar} as iCalendar text, failing with an
+ * {@link EncodeError}. The encoding runs when the Effect runs.
+ *
+ * @example
+ * ```ts
+ * import { encode } from "@thomasfosterau/effect-ical"
+ * import * as Effect from "effect/Effect"
+ *
+ * const program = encode({ component: "VCALENDAR", version: "2.0", prodid: "-//Example//EN" })
+ * const text = await Effect.runPromise(program)
+ * ```
+ *
+ * @category encoding
  */
-const escapeValue = (value: string): string => {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\\;")
-    .replace(/,/g, "\\,")
-    .replace(/\n/g, "\\n");
-};
+export const encode = (calendar: Types.VCalendar): Effect.Effect<string, EncodeError> =>
+  Effect.suspend(() => Effect.fromResult(encodeResult(calendar)));
 
 /**
- * Format a content line
+ * Encode a {@link Types.VCalendar} as iCalendar text, throwing the
+ * {@link EncodeError} when `version` or `prodid` is missing.
+ *
+ * @example
+ * ```ts
+ * import { encodeSync } from "@thomasfosterau/effect-ical"
+ *
+ * const text = encodeSync({ component: "VCALENDAR", version: "2.0", prodid: "-//Example//EN" })
+ * ```
+ *
+ * @category encoding
  */
-const formatContentLine = (name: string, value: string, params?: Record<string, string>): string => {
-  let line = name.toUpperCase();
-
-  if (params) {
-    for (const [key, val] of Object.entries(params)) {
-      line += `;${key.toUpperCase()}=${val}`;
-    }
-  }
-
-  line += `:${value}`;
-  return foldLine(line);
-};
-
-/**
- * Encode an alarm component
- */
-const encodeAlarm = (alarm: Types.VAlarm): string[] => {
-  const lines: string[] = [];
-
-  lines.push("BEGIN:VALARM");
-  lines.push(formatContentLine("ACTION", alarm.action));
-  lines.push(formatContentLine("TRIGGER", alarm.trigger));
-
-  if (alarm.duration) {
-    lines.push(formatContentLine("DURATION", alarm.duration));
-  }
-  if (alarm.repeat !== undefined) {
-    lines.push(formatContentLine("REPEAT", alarm.repeat.toString()));
-  }
-  if (alarm.description) {
-    lines.push(formatContentLine("DESCRIPTION", escapeValue(alarm.description)));
-  }
-  if (alarm.summary) {
-    lines.push(formatContentLine("SUMMARY", escapeValue(alarm.summary)));
-  }
-  if (alarm.attendee) {
-    for (const attendee of alarm.attendee) {
-      lines.push(formatContentLine("ATTENDEE", attendee));
-    }
-  }
-  if (alarm.attach) {
-    lines.push(formatContentLine("ATTACH", alarm.attach));
-  }
-
-  lines.push("END:VALARM");
-  return lines;
-};
-
-/**
- * Encode a VEVENT component
- */
-const encodeEvent = (event: Types.VEvent): string[] => {
-  const lines: string[] = [];
-
-  lines.push("BEGIN:VEVENT");
-
-  // DTSTART is required by RFC 5545
-  lines.push(formatContentLine("DTSTART", event.dtstart));
-
-  // Optional properties
-  if (event.uid) {
-    lines.push(formatContentLine("UID", event.uid));
-  }
-  if (event.dtstamp) {
-    lines.push(formatContentLine("DTSTAMP", event.dtstamp));
-  }
-  if (event.dtend) {
-    lines.push(formatContentLine("DTEND", event.dtend));
-  }
-  if (event.duration) {
-    lines.push(formatContentLine("DURATION", event.duration));
-  }
-  if (event.summary) {
-    lines.push(formatContentLine("SUMMARY", escapeValue(event.summary)));
-  }
-  if (event.description) {
-    lines.push(formatContentLine("DESCRIPTION", escapeValue(event.description)));
-  }
-  if (event.location) {
-    lines.push(formatContentLine("LOCATION", escapeValue(event.location)));
-  }
-  if (event.organizer) {
-    lines.push(formatContentLine("ORGANIZER", event.organizer));
-  }
-  if (event.attendee) {
-    for (const attendee of event.attendee) {
-      lines.push(formatContentLine("ATTENDEE", attendee));
-    }
-  }
-  if (event.categories) {
-    lines.push(formatContentLine("CATEGORIES", event.categories.join(",")));
-  }
-  if (event.status) {
-    lines.push(formatContentLine("STATUS", event.status));
-  }
-  if (event.rrule) {
-    lines.push(formatContentLine("RRULE", event.rrule));
-  }
-  if (event.rdate) {
-    for (const rdate of event.rdate) {
-      lines.push(formatContentLine("RDATE", rdate));
-    }
-  }
-  if (event.exdate) {
-    for (const exdate of event.exdate) {
-      lines.push(formatContentLine("EXDATE", exdate));
-    }
-  }
-  if (event.url) {
-    lines.push(formatContentLine("URL", event.url));
-  }
-  if (event.geo) {
-    lines.push(formatContentLine("GEO", `${event.geo.lat};${event.geo.lon}`));
-  }
-  if (event.priority !== undefined) {
-    lines.push(formatContentLine("PRIORITY", event.priority.toString()));
-  }
-  if (event.class) {
-    lines.push(formatContentLine("CLASS", event.class));
-  }
-
-  // Alarms
-  if (event.alarms) {
-    for (const alarm of event.alarms) {
-      lines.push(...encodeAlarm(alarm));
-    }
-  }
-
-  lines.push("END:VEVENT");
-  return lines;
-};
-
-/**
- * Encode a VTODO component
- */
-const encodeTodo = (todo: Types.VTodo): string[] => {
-  const lines: string[] = [];
-
-  lines.push("BEGIN:VTODO");
-
-  if (todo.uid) {
-    lines.push(formatContentLine("UID", todo.uid));
-  }
-  if (todo.dtstamp) {
-    lines.push(formatContentLine("DTSTAMP", todo.dtstamp));
-  }
-  if (todo.dtstart) {
-    lines.push(formatContentLine("DTSTART", todo.dtstart));
-  }
-  if (todo.due) {
-    lines.push(formatContentLine("DUE", todo.due));
-  }
-  if (todo.duration) {
-    lines.push(formatContentLine("DURATION", todo.duration));
-  }
-  if (todo.summary) {
-    lines.push(formatContentLine("SUMMARY", escapeValue(todo.summary)));
-  }
-  if (todo.description) {
-    lines.push(formatContentLine("DESCRIPTION", escapeValue(todo.description)));
-  }
-  if (todo.location) {
-    lines.push(formatContentLine("LOCATION", escapeValue(todo.location)));
-  }
-  if (todo.status) {
-    lines.push(formatContentLine("STATUS", todo.status));
-  }
-  if (todo.percent !== undefined) {
-    lines.push(formatContentLine("PERCENT-COMPLETE", todo.percent.toString()));
-  }
-  if (todo.completed) {
-    lines.push(formatContentLine("COMPLETED", todo.completed));
-  }
-  if (todo.priority !== undefined) {
-    lines.push(formatContentLine("PRIORITY", todo.priority.toString()));
-  }
-  if (todo.rrule) {
-    lines.push(formatContentLine("RRULE", todo.rrule));
-  }
-
-  // Alarms
-  if (todo.alarms) {
-    for (const alarm of todo.alarms) {
-      lines.push(...encodeAlarm(alarm));
-    }
-  }
-
-  lines.push("END:VTODO");
-  return lines;
-};
-
-/**
- * Encode a VJOURNAL component
- */
-const encodeJournal = (journal: Types.VJournal): string[] => {
-  const lines: string[] = [];
-
-  lines.push("BEGIN:VJOURNAL");
-
-  if (journal.uid) {
-    lines.push(formatContentLine("UID", journal.uid));
-  }
-  if (journal.dtstamp) {
-    lines.push(formatContentLine("DTSTAMP", journal.dtstamp));
-  }
-  if (journal.dtstart) {
-    lines.push(formatContentLine("DTSTART", journal.dtstart));
-  }
-  if (journal.summary) {
-    lines.push(formatContentLine("SUMMARY", escapeValue(journal.summary)));
-  }
-  if (journal.description) {
-    lines.push(formatContentLine("DESCRIPTION", escapeValue(journal.description)));
-  }
-  if (journal.status) {
-    lines.push(formatContentLine("STATUS", journal.status));
-  }
-  if (journal.class) {
-    lines.push(formatContentLine("CLASS", journal.class));
-  }
-
-  lines.push("END:VJOURNAL");
-  return lines;
-};
-
-/**
- * Encode a VFREEBUSY component
- */
-const encodeFreeBusy = (freebusy: Types.VFreeBusy): string[] => {
-  const lines: string[] = [];
-
-  lines.push("BEGIN:VFREEBUSY");
-
-  // DTSTART and DTEND are required by RFC 5545
-  if (freebusy.uid) {
-    lines.push(formatContentLine("UID", freebusy.uid));
-  }
-  if (freebusy.dtstamp) {
-    lines.push(formatContentLine("DTSTAMP", freebusy.dtstamp));
-  }
-  lines.push(formatContentLine("DTSTART", freebusy.dtstart));
-  lines.push(formatContentLine("DTEND", freebusy.dtend));
-  if (freebusy.organizer) {
-    lines.push(formatContentLine("ORGANIZER", freebusy.organizer));
-  }
-  if (freebusy.url) {
-    lines.push(formatContentLine("URL", freebusy.url));
-  }
-  if (freebusy.attendee) {
-    for (const attendee of freebusy.attendee) {
-      lines.push(formatContentLine("ATTENDEE", attendee));
-    }
-  }
-  if (freebusy.freebusy) {
-    for (const fb of freebusy.freebusy) {
-      const periods = fb.periods.map((p) => `${p.start}/${p.end}`).join(",");
-      const params = fb.type ? { FBTYPE: fb.type } : undefined;
-      lines.push(formatContentLine("FREEBUSY", periods, params));
-    }
-  }
-
-  lines.push("END:VFREEBUSY");
-  return lines;
-};
-
-/**
- * Encode a VTIMEZONE component
- */
-const encodeTimezone = (timezone: Types.VTimezone): string[] => {
-  const lines: string[] = [];
-
-  lines.push("BEGIN:VTIMEZONE");
-
-  // TZID is required by RFC 5545
-  lines.push(formatContentLine("TZID", timezone.tzid));
-
-  if (timezone.lastmod) {
-    lines.push(formatContentLine("LAST-MODIFIED", timezone.lastmod));
-  }
-  if (timezone.tzurl) {
-    lines.push(formatContentLine("TZURL", timezone.tzurl));
-  }
-
-  // Standard time
-  if (timezone.standard) {
-    for (const std of timezone.standard) {
-      lines.push("BEGIN:STANDARD");
-      lines.push(formatContentLine("DTSTART", std.dtstart));
-      lines.push(formatContentLine("TZOFFSETFROM", std.tzoffsetfrom));
-      lines.push(formatContentLine("TZOFFSETTO", std.tzoffsetto));
-      if (std.rrule) {
-        lines.push(formatContentLine("RRULE", std.rrule));
-      }
-      if (std.tzname) {
-        lines.push(formatContentLine("TZNAME", std.tzname));
-      }
-      lines.push("END:STANDARD");
-    }
-  }
-
-  // Daylight saving time
-  if (timezone.daylight) {
-    for (const dst of timezone.daylight) {
-      lines.push("BEGIN:DAYLIGHT");
-      lines.push(formatContentLine("DTSTART", dst.dtstart));
-      lines.push(formatContentLine("TZOFFSETFROM", dst.tzoffsetfrom));
-      lines.push(formatContentLine("TZOFFSETTO", dst.tzoffsetto));
-      if (dst.rrule) {
-        lines.push(formatContentLine("RRULE", dst.rrule));
-      }
-      if (dst.tzname) {
-        lines.push(formatContentLine("TZNAME", dst.tzname));
-      }
-      lines.push("END:DAYLIGHT");
-    }
-  }
-
-  lines.push("END:VTIMEZONE");
-  return lines;
-};
-
-/**
- * Encode a VCalendar object into an iCalendar string
- * 
- * @param calendar - The VCalendar object to encode
- * @returns Effect that succeeds with the iCalendar string or fails with EncodeError
- */
-export const encode = (calendar: Types.VCalendar): Effect.Effect<string, EncodeError> => {
-  return Effect.gen(function* (_) {
-    const lines: string[] = [];
-
-    lines.push("BEGIN:VCALENDAR");
-
-    // Required properties
-    if (!calendar.version) {
-      return yield* _(Effect.fail(new EncodeError("VERSION property is required")));
-    }
-    if (!calendar.prodid) {
-      return yield* _(Effect.fail(new EncodeError("PRODID property is required")));
-    }
-
-    lines.push(formatContentLine("VERSION", calendar.version));
-    lines.push(formatContentLine("PRODID", calendar.prodid));
-
-    // Optional properties
-    if (calendar.calscale) {
-      lines.push(formatContentLine("CALSCALE", calendar.calscale));
-    }
-    if (calendar.method) {
-      lines.push(formatContentLine("METHOD", calendar.method));
-    }
-    if (calendar.name) {
-      lines.push(formatContentLine("NAME", escapeValue(calendar.name)));
-    }
-    if (calendar.description) {
-      lines.push(formatContentLine("DESCRIPTION", escapeValue(calendar.description)));
-    }
-
-    // Timezones
-    if (calendar.timezones) {
-      for (const timezone of calendar.timezones) {
-        lines.push(...encodeTimezone(timezone));
-      }
-    }
-
-    // Events
-    if (calendar.events) {
-      for (const event of calendar.events) {
-        lines.push(...encodeEvent(event));
-      }
-    }
-
-    // Todos
-    if (calendar.todos) {
-      for (const todo of calendar.todos) {
-        lines.push(...encodeTodo(todo));
-      }
-    }
-
-    // Journals
-    if (calendar.journals) {
-      for (const journal of calendar.journals) {
-        lines.push(...encodeJournal(journal));
-      }
-    }
-
-    // Free/Busy
-    if (calendar.freebusys) {
-      for (const freebusy of calendar.freebusys) {
-        lines.push(...encodeFreeBusy(freebusy));
-      }
-    }
-
-    lines.push("END:VCALENDAR");
-
-    return lines.join("\r\n") + "\r\n";
+export const encodeSync = (calendar: Types.VCalendar): string =>
+  Result.match(encodeResult(calendar), {
+    onFailure: (error) => {
+      throw error;
+    },
+    onSuccess: (text) => text,
   });
-};
-
-/**
- * Encode a VCalendar object and return the string directly (synchronous)
- */
-export const encodeSync = (calendar: Types.VCalendar): string => {
-  return Effect.runSync(encode(calendar));
-};
