@@ -32,7 +32,7 @@ const isCompleteCalendar = (calendar: Partial<Types.VCalendar>): calendar is Typ
   Boolean(calendar.prodid);
 
 /**
- * Builder for creating VEVENT components
+ * A mutable, chainable builder for a `VEvent`; `build()` requires `dtstart`.
  */
 export class EventBuilder {
   private event: Partial<Types.VEvent> = {
@@ -198,7 +198,7 @@ export class EventBuilder {
   }
 
   /**
-   * Add a display alarm
+   * Add a `DISPLAY` alarm firing at `trigger` (e.g. `-PT15M`), with an optional description.
    */
   addDisplayAlarm(trigger: string, description?: string): this {
     const alarm: Types.VAlarm = { component: "VALARM", action: "DISPLAY", trigger };
@@ -206,7 +206,7 @@ export class EventBuilder {
   }
 
   /**
-   * Build the event
+   * Return the event, throwing a {@link BuildError} if `dtstart` is missing or empty.
    */
   build(): Types.VEvent {
     if (!isCompleteEvent(this.event)) {
@@ -217,7 +217,7 @@ export class EventBuilder {
 }
 
 /**
- * Builder for creating VTODO components
+ * A mutable, chainable builder for a `VTodo`.
  */
 export class TodoBuilder {
   private todo: Types.VTodo = {
@@ -289,7 +289,7 @@ export class TodoBuilder {
   }
 
   /**
-   * Set the percent complete (0-100)
+   * Set the percent complete, clamped to 0–100.
    */
   percentComplete(percent: number): this {
     this.todo.percent = Math.max(0, Math.min(100, percent));
@@ -340,7 +340,7 @@ export class TodoBuilder {
   }
 
   /**
-   * Build the todo
+   * Return the to-do (the builder's own object; later setter calls still change it).
    */
   build(): Types.VTodo {
     return this.todo;
@@ -348,7 +348,7 @@ export class TodoBuilder {
 }
 
 /**
- * Builder for creating VCALENDAR components
+ * A mutable, chainable builder for a `VCalendar`; `build()` requires `prodid`.
  */
 export class CalendarBuilder {
   private calendar: Partial<Types.VCalendar> = {
@@ -408,7 +408,7 @@ export class CalendarBuilder {
   }
 
   /**
-   * Add an event using a builder function
+   * Build an event with `builderFn` on a fresh `EventBuilder` and add it.
    */
   event(builderFn: (builder: EventBuilder) => EventBuilder): this {
     const builder = new EventBuilder();
@@ -428,7 +428,7 @@ export class CalendarBuilder {
   }
 
   /**
-   * Add a todo using a builder function
+   * Build a to-do with `builderFn` on a fresh `TodoBuilder` and add it.
    */
   todo(builderFn: (builder: TodoBuilder) => TodoBuilder): this {
     const builder = new TodoBuilder();
@@ -459,7 +459,7 @@ export class CalendarBuilder {
   }
 
   /**
-   * Build the calendar
+   * Return the calendar, throwing a {@link BuildError} if `prodid` is missing or empty.
    */
   build(): Types.VCalendar {
     if (!isCompleteCalendar(this.calendar)) {
@@ -469,14 +469,14 @@ export class CalendarBuilder {
   }
 
   /**
-   * Build and encode the calendar to iCal format
+   * Build the calendar and encode it as iCalendar text with `encodeSync`.
    */
   toICalString(): string {
     return encodeSync(this.build());
   }
 
   /**
-   * Build and encode the calendar to iCal format using Effect
+   * Build the calendar and encode it with `encode`; `build()` runs (and may throw) immediately.
    */
   toICalEffect(): Effect.Effect<string, EncodeError> {
     return encode(this.build());
@@ -484,21 +484,21 @@ export class CalendarBuilder {
 }
 
 /**
- * Create a new calendar builder
+ * Start building a calendar with the given product identifier (`PRODID`).
  */
 export function createCalendar(prodid: string): CalendarBuilder {
   return new CalendarBuilder().prodid(prodid);
 }
 
 /**
- * Create a new event builder
+ * Start building an event.
  */
 export function createEvent(): EventBuilder {
   return new EventBuilder();
 }
 
 /**
- * Create a new todo builder
+ * Start building a to-do.
  */
 export function createTodo(): TodoBuilder {
   return new TodoBuilder();

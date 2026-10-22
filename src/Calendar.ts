@@ -48,7 +48,7 @@ export class Calendar extends Schema.Class<Calendar>("Calendar")({
 }) {}
 
 /**
- * Create a new Calendar with required properties
+ * Create a calendar with `version` 2.0 and the given product identifier (`PRODID`).
  */
 export const make = (prodid: string): Calendar => {
   return new Calendar({
@@ -59,21 +59,21 @@ export const make = (prodid: string): Calendar => {
 };
 
 /**
- * Builder context for constructing calendars
+ * The value the pipeable `with*` setters thread through: a calendar under construction.
  */
 export interface Builder {
   readonly calendar: Calendar;
 }
 
 /**
- * Create a builder for constructing calendars
+ * Start a calendar pipeline, with the placeholder product identifier `-//effect-ical//EN`.
  */
 export const builder = (): Builder => ({
   calendar: make("-//effect-ical//EN"),
 });
 
 /**
- * Set the product ID
+ * Set the calendar's product identifier (`PRODID`).
  */
 export const withProdid =
   (prodid: string) =>
@@ -83,7 +83,7 @@ export const withProdid =
   });
 
 /**
- * Set the calendar name
+ * Set the calendar's display name (`NAME`).
  */
 export const withName =
   (name: string) =>
@@ -93,7 +93,7 @@ export const withName =
   });
 
 /**
- * Set the calendar description
+ * Set the calendar's description (`DESCRIPTION`).
  */
 export const withDescription =
   (description: string) =>
@@ -103,7 +103,7 @@ export const withDescription =
   });
 
 /**
- * Set the calendar scale
+ * Set the calendar scale (`CALSCALE`); RFC 5545 defines only `GREGORIAN`.
  */
 export const withCalscale =
   (calscale: "GREGORIAN") =>
@@ -113,7 +113,7 @@ export const withCalscale =
   });
 
 /**
- * Set the method
+ * Set the iTIP method (`METHOD`), such as `PUBLISH` or `REQUEST`.
  */
 export const withMethod =
   (method: string) =>
@@ -123,7 +123,7 @@ export const withMethod =
   });
 
 /**
- * Add an event to the calendar
+ * Append an event to the calendar's `events`.
  */
 export const withEvent =
   (event: Event) =>
@@ -136,7 +136,7 @@ export const withEvent =
   });
 
 /**
- * Add a todo to the calendar
+ * Append a to-do to the calendar's `todos`.
  */
 export const withTodo =
   (todo: Todo) =>
@@ -149,7 +149,7 @@ export const withTodo =
   });
 
 /**
- * Build the final calendar from builder
+ * Finish a calendar pipeline, returning the calendar.
  */
 export const build = (builder: Builder): Calendar => builder.calendar;
 

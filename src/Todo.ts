@@ -16,7 +16,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 /**
- * Todo Schema - represents a VTODO component
+ * A `VTODO` component: an action item, as an Effect Schema class.
  */
 export class Todo extends Schema.Class<Todo>("Todo")({
   component: Schema.Literal("VTODO"),
@@ -38,7 +38,7 @@ export class Todo extends Schema.Class<Todo>("Todo")({
 }) {}
 
 /**
- * Create a new Todo
+ * Create an empty to-do.
  */
 export const make = (): Todo => {
   return new Todo({
@@ -47,7 +47,7 @@ export const make = (): Todo => {
 };
 
 /**
- * Set UID
+ * Return a copy of the to-do with its unique identifier (`UID`) set.
  */
 export const withUid =
   (uid: string) =>
@@ -57,7 +57,7 @@ export const withUid =
   });
 
 /**
- * Set DTSTART
+ * Return a copy of the to-do with its start (`DTSTART`) set.
  */
 export const withDtstart =
   (dtstart: string) =>
@@ -67,7 +67,7 @@ export const withDtstart =
   });
 
 /**
- * Set DUE
+ * Return a copy of the to-do with its due date (`DUE`) set.
  */
 export const withDue =
   (due: string) =>
@@ -77,7 +77,7 @@ export const withDue =
   });
 
 /**
- * Set summary
+ * Return a copy of the to-do with its summary (`SUMMARY`) set.
  */
 export const withSummary =
   (summary: string) =>
@@ -87,7 +87,7 @@ export const withSummary =
   });
 
 /**
- * Set description
+ * Return a copy of the to-do with its description (`DESCRIPTION`) set.
  */
 export const withDescription =
   (description: string) =>
@@ -97,7 +97,7 @@ export const withDescription =
   });
 
 /**
- * Set location
+ * Return a copy of the to-do with its location (`LOCATION`) set.
  */
 export const withLocation =
   (location: string) =>
@@ -107,7 +107,7 @@ export const withLocation =
   });
 
 /**
- * Set status
+ * Return a copy of the to-do with its status (`STATUS`) set.
  */
 export const withStatus =
   (status: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED") =>
@@ -117,7 +117,7 @@ export const withStatus =
   });
 
 /**
- * Set percent complete (0-100)
+ * Return a copy of the to-do with its completion (`PERCENT-COMPLETE`) set, clamped to 0–100.
  */
 export const withPercent =
   (percent: number) =>
@@ -127,7 +127,7 @@ export const withPercent =
   });
 
 /**
- * Set completed date
+ * Return a copy of the to-do with its completion time (`COMPLETED`) set.
  */
 export const withCompleted =
   (completed: string) =>
@@ -137,7 +137,7 @@ export const withCompleted =
   });
 
 /**
- * Set priority
+ * Return a copy of the to-do with its priority (`PRIORITY`: 0 undefined, 1 highest, 9 lowest) set.
  */
 export const withPriority =
   (priority: number) =>
@@ -147,7 +147,7 @@ export const withPriority =
   });
 
 /**
- * Set recurrence rule
+ * Return a copy of the to-do with its recurrence rule (`RRULE`) set.
  */
 export const withRrule =
   (rrule: string) =>

@@ -14,7 +14,7 @@
     "parser",
     "rfc5545"
   ],
-  "homepage": "https://github.com/thomasfosterau/effect-ical#readme",
+  "homepage": "https://www.npmjs.com/package/@thomasfosterau/effect-ical",
   "bugs": {
     "url": "https://github.com/thomasfosterau/effect-ical/issues"
   },
@@ -27,6 +27,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "type": "module",

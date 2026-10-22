@@ -17,7 +17,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 /**
- * Event Schema - represents a VEVENT component
+ * A `VEVENT` component: a scheduled event, as an Effect Schema class.
  */
 export class Event extends Schema.Class<Event>("Event")({
   component: Schema.Literal("VEVENT"),
@@ -42,7 +42,7 @@ export class Event extends Schema.Class<Event>("Event")({
 }) {}
 
 /**
- * Create a new Event with required properties
+ * Create an event starting at `dtstart` (an RFC 5545 DATE or DATE-TIME string).
  */
 export const make = (dtstart: string): Event => {
   return new Event({
@@ -52,7 +52,7 @@ export const make = (dtstart: string): Event => {
 };
 
 /**
- * Set UID
+ * Return a copy of the event with its unique identifier (`UID`) set.
  */
 export const withUid =
   (uid: string) =>
@@ -62,7 +62,7 @@ export const withUid =
   });
 
 /**
- * Set DTEND
+ * Return a copy of the event with its end (`DTEND`) set.
  */
 export const withDtend =
   (dtend: string) =>
@@ -72,7 +72,7 @@ export const withDtend =
   });
 
 /**
- * Set duration
+ * Return a copy of the event with its duration (`DURATION`, e.g. `PT1H`) set.
  */
 export const withDuration =
   (duration: string) =>
@@ -82,7 +82,7 @@ export const withDuration =
   });
 
 /**
- * Set summary
+ * Return a copy of the event with its summary (`SUMMARY`) set.
  */
 export const withSummary =
   (summary: string) =>
@@ -92,7 +92,7 @@ export const withSummary =
   });
 
 /**
- * Set description
+ * Return a copy of the event with its description (`DESCRIPTION`) set.
  */
 export const withDescription =
   (description: string) =>
@@ -102,7 +102,7 @@ export const withDescription =
   });
 
 /**
- * Set location
+ * Return a copy of the event with its location (`LOCATION`) set.
  */
 export const withLocation =
   (location: string) =>
@@ -112,7 +112,7 @@ export const withLocation =
   });
 
 /**
- * Set organizer
+ * Return a copy of the event with its organizer (`ORGANIZER`, e.g. a `mailto:` URI) set.
  */
 export const withOrganizer =
   (organizer: string) =>
@@ -122,7 +122,7 @@ export const withOrganizer =
   });
 
 /**
- * Add an attendee
+ * Return a copy of the event with one more attendee (`ATTENDEE`) appended.
  */
 export const withAttendee =
   (attendee: string) =>
@@ -132,7 +132,7 @@ export const withAttendee =
   });
 
 /**
- * Set categories
+ * Return a copy of the event with its categories (`CATEGORIES`) replaced.
  */
 export const withCategories =
   (categories: string[]) =>
@@ -142,7 +142,7 @@ export const withCategories =
   });
 
 /**
- * Set status
+ * Return a copy of the event with its status (`STATUS`) set.
  */
 export const withStatus =
   (status: "TENTATIVE" | "CONFIRMED" | "CANCELLED") =>
@@ -152,7 +152,7 @@ export const withStatus =
   });
 
 /**
- * Set recurrence rule
+ * Return a copy of the event with its recurrence rule (`RRULE`, e.g. `FREQ=WEEKLY`) set.
  */
 export const withRrule =
   (rrule: string) =>
@@ -162,7 +162,7 @@ export const withRrule =
   });
 
 /**
- * Set URL
+ * Return a copy of the event with its URL (`URL`) set.
  */
 export const withUrl =
   (url: string) =>
@@ -172,7 +172,7 @@ export const withUrl =
   });
 
 /**
- * Set priority
+ * Return a copy of the event with its priority (`PRIORITY`: 0 undefined, 1 highest, 9 lowest) set.
  */
 export const withPriority =
   (priority: number) =>
@@ -182,7 +182,7 @@ export const withPriority =
   });
 
 /**
- * Set classification
+ * Return a copy of the event with its access classification (`CLASS`) set.
  */
 export const withClassification =
   (classification: "PUBLIC" | "PRIVATE" | "CONFIDENTIAL") =>

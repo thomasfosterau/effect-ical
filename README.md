@@ -1,367 +1,202 @@
 # @thomasfosterau/effect-ical
 
-A modern iCalendar (RFC 5545) library for JavaScript/TypeScript using Effect idioms. This library provides type-safe encoding and decoding of iCalendar files with comprehensive support for the iCal format.
+iCalendar ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)) encoding and decoding for [Effect](https://effect.website): a typed object model for `VCALENDAR` data, a parser and an encoder (as pure `Result` functions and as Effects), fluent builders, and pipeable `Calendar` / `Event` / `Todo` modules.
 
-## Features
+- Components: `VEVENT`, `VTODO`, `VJOURNAL`, `VFREEBUSY`, `VTIMEZONE` (with `STANDARD` / `DAYLIGHT`) and `VALARM`.
+- The encoder escapes TEXT values, folds lines at 75 octets (UTF-8, never splitting a character) and writes CRLF line endings; the parser unfolds lines and collects repeatable properties (`ATTENDEE`, `CATEGORIES`, `RDATE`, `EXDATE`) into arrays.
+- Values stay verbatim strings: dates, durations and recurrence rules are not decoded, and parsed TEXT values are not unescaped.
+- Failures are tagged errors (`ParseError`, `EncodeError`, `BuildError`) you can handle with `Effect.catchTag`.
 
-- 🎯 **Type-safe**: Full TypeScript support with Effect Schema
-- 🔄 **Effect-based**: Built using Effect idioms for functional, composable operations
-- 📦 **Module Namespaces**: Clean API with Calendar, Event, and Todo modules
-- 🔗 **Pipe API**: Composable functions using Effect's pipe for building calendars
-- 📅 **RFC 5545 Compliant**: Implements the iCalendar format specification
-- ✅ **Encode/Decode**: Full support for encoding and decoding iCalendar files
-- 🧩 **Component Support**: VEVENT, VTODO, VJOURNAL, VFREEBUSY, VTIMEZONE, and VALARM
-- ⚡ **Built with Bun**: Fast development and testing with Bun runtime
-- 📦 **Changesets**: Versioning with changesets for clean release management
+| Package | Purpose | Peers |
+| --- | --- | --- |
+| [`@thomasfosterau/effect-ical`](https://www.npmjs.com/package/@thomasfosterau/effect-ical) | iCalendar parse, encode and build | `effect` `>=4.0.0-rc.118` |
 
-## Installation
+## Install
 
-```bash
-npm install @thomasfosterau/effect-ical effect
+```sh
+pnpm add @thomasfosterau/effect-ical effect
 ```
 
-or with Bun:
+The package is ESM only and has no runtime dependencies besides its `effect` peer.
 
-```bash
-bun add @thomasfosterau/effect-ical effect
-```
+## Quick start
 
-## Usage
+```ts
+import { encodeSync, parse } from "@thomasfosterau/effect-ical";
+import type { VCalendar } from "@thomasfosterau/effect-ical";
+import * as Effect from "effect/Effect";
 
-### Effect-Style API (Recommended)
-
-The Effect-style API uses module namespaces and pipe for composable calendar operations:
-
-```typescript
-import { pipe } from "effect";
-import * as Calendar from "@thomasfosterau/effect-ical/Calendar";
-import * as Event from "@thomasfosterau/effect-ical/Event";
-import * as Todo from "@thomasfosterau/effect-ical/Todo";
-
-// Create an event with pipe
-const event = pipe(
-  Event.make("20240115T100000Z"),
-  Event.withUid("event-001"),
-  Event.withSummary("Team Standup"),
-  Event.withDtend("20240115T110000Z"),
-  Event.withLocation("Conference Room A"),
-  Event.withStatus("CONFIRMED")
-);
-
-// Create a todo with pipe
-const todo = pipe(
-  Todo.make(),
-  Todo.withUid("todo-001"),
-  Todo.withSummary("Complete proposal"),
-  Todo.withDue("20240120T170000Z"),
-  Todo.withStatus("IN-PROCESS"),
-  Todo.withPercent(60)
-);
-
-// Build a calendar with pipe
-const calendar = pipe(
-  Calendar.builder(),
-  Calendar.withProdid("-//My Company//My App//EN"),
-  Calendar.withName("Work Calendar"),
-  Calendar.withEvent(event),
-  Calendar.withTodo(todo),
-  Calendar.build
-);
-
-// Encode to iCal format
-const program = Calendar.encode(calendar);
-const icalString = await Effect.runPromise(program);
-console.log(icalString);
-```
-
-### Decoding iCalendar Files
-
-```typescript
-import * as Calendar from "@thomasfosterau/effect-ical/Calendar";
-import { Effect } from "effect";
-
-const icalString = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//My Company//My Product//EN
-BEGIN:VEVENT
-UID:event123
-DTSTART:20240101T120000Z
-DTEND:20240101T130000Z
-SUMMARY:Team Meeting
-DESCRIPTION:Monthly team sync
-LOCATION:Conference Room A
-END:VEVENT
-END:VCALENDAR
-`;
-
-// Decode using Effect
-const program = Calendar.decode(icalString);
-const calendar = await Effect.runPromise(program);
-console.log(calendar.events?.[0]?.summary); // Logs event details
-```
-
-### Legacy APIs (Backward Compatibility)
-
-The library still includes the previous APIs for backward compatibility:
-
-#### Fluent Builder API
-
-```typescript
-import { createCalendar } from "@thomasfosterau/effect-ical";
-
-const icalString = createCalendar("-//My Company//My Product//EN")
-  .name("Work Calendar")
-  .event((e) =>
-    e
-      .uid("event123")
-      .dtstart("20240101T120000Z")
-      .summary("Team Meeting")
-  )
-  .toICalString();
-```
-
-#### Low-Level Parser/Encoder API
-
-```typescript
-import { parse, parseEither } from "effect-ical";
-import { Effect } from "effect";
-
-// Using Effect
-const icalString = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//My Company//My Product//EN
-BEGIN:VEVENT
-UID:event123
-DTSTART:20240101T120000Z
-DTEND:20240101T130000Z
-SUMMARY:Team Meeting
-DESCRIPTION:Monthly team sync
-LOCATION:Conference Room A
-END:VEVENT
-END:VCALENDAR
-`;
-
-// Parse using Effect
-const program = parse(icalString);
-const calendar = await Effect.runPromise(program);
-
-// Or use Either for synchronous parsing
-const result = parseEither(icalString);
-if (result._tag === "Right") {
-  const calendar = result.right;
-  console.log(calendar.events?.[0]?.summary); // "Team Meeting"
-}
-```
-
-### Encoding iCalendar Files
-
-```typescript
-import { encode, encodeSync } from "effect-ical";
-import type { VCalendar, VEvent } from "effect-ical";
-
-// Create a calendar
 const calendar: VCalendar = {
   component: "VCALENDAR",
   version: "2.0",
-  prodid: "-//My Company//My Product//EN",
+  prodid: "-//Example Corp//Example App//EN",
   events: [
     {
       component: "VEVENT",
-      uid: "event123",
-      dtstart: "20240101T120000Z",
-      dtend: "20240101T130000Z",
-      summary: "Team Meeting",
-      description: "Monthly team sync",
-      location: "Conference Room A",
+      uid: "standup@example.com",
+      dtstart: "20240115T100000Z",
+      dtend: "20240115T110000Z",
+      summary: "Team standup",
+      location: "Room A",
     },
   ],
 };
 
-// Encode synchronously
-const icalString = encodeSync(calendar);
-console.log(icalString);
+const text = encodeSync(calendar); // "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n…"
 
-// Or use Effect
-const program = encode(calendar);
-const icalString2 = await Effect.runPromise(program);
+const program = parse(text).pipe(
+  Effect.map((parsed) => parsed.events?.[0]?.summary), // "Team standup"
+  Effect.catchTag("ParseError", (error) => Effect.succeed(`invalid: ${error.message}`)),
+);
 ```
 
-### Working with Events (Builder API)
+## API
 
-```typescript
-import { createEvent } from "effect-ical";
+Everything is exported from the package root.
 
-// Create an event independently
-const event = createEvent()
-  .uid("event456")
-  .dtstart("20240115T090000Z")
-  .dtend("20240115T100000Z")
-  .summary("Doctor Appointment")
-  .location("Medical Center")
-  .status("CONFIRMED")
-  .priority(1)
-  .addDisplayAlarm("-PT15M", "Appointment reminder")
-  .build();
+### Parsing
+
+| Export | Signature | Notes |
+| --- | --- | --- |
+| `parse` | `(text: string) => Effect<VCalendar, ParseError>` | Runs when the Effect runs. |
+| `parseResult` | `(text: string) => Result<VCalendar, ParseError>` | The same parse, synchronously. |
+| `ParseError` | tagged error, `_tag: "ParseError"`, `message` | No `VCALENDAR`, an unclosed calendar, a line without `:`, a missing or non-`2.0` `VERSION`, or a missing `PRODID`. |
+
+Text before the first `BEGIN:VCALENDAR` and after its `END:VCALENDAR` is ignored, and so are components of an unknown type. Property names become lower-cased fields (`PERCENT-COMPLETE` → `percent`, `LAST-MODIFIED` → `lastmod`, `X-WR-CALNAME` → `"x-wr-calname"`); `PRIORITY`, `PERCENT-COMPLETE`, `REPEAT` and `SEQUENCE` become numbers when they are integers. Property parameters (`;TZID=…`) are dropped.
+
+```ts
+import { parseResult } from "@thomasfosterau/effect-ical";
+import * as Result from "effect/Result";
+
+const result = parseResult(
+  "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//EN\r\nEND:VCALENDAR\r\n",
+);
+if (Result.isSuccess(result)) {
+  console.log(result.success.prodid); // "-//Example//EN"
+} else {
+  console.log(result.failure.message);
+}
 ```
 
-### Working with Todos (Builder API)
+### Encoding
 
-```typescript
-import { createTodo } from "effect-ical";
+| Export | Signature | Notes |
+| --- | --- | --- |
+| `encode` | `(calendar: VCalendar) => Effect<string, EncodeError>` | Runs when the Effect runs. |
+| `encodeResult` | `(calendar: VCalendar) => Result<string, EncodeError>` | Synchronous. |
+| `encodeSync` | `(calendar: VCalendar) => string` | Throws the `EncodeError`. |
+| `EncodeError` | tagged error, `_tag: "EncodeError"`, `message` | `version` or `prodid` missing or empty (only possible for a value that bypassed the types). |
 
-const todo = createTodo()
-  .uid("todo789")
-  .dtstart("20240201T090000Z")
-  .due("20240205T170000Z")
-  .summary("Complete project documentation")
-  .status("IN-PROCESS")
-  .percentComplete(50)
-  .priority(2)
-  .build();
-```
+Components are written in a fixed order: timezones, events, to-dos, journals, free/busy. Optional string properties that are empty are omitted; numeric ones (`priority`, `percent`, `repeat`) are written whenever set, `0` included. `SUMMARY`, `DESCRIPTION`, `LOCATION` and `NAME` are escaped (`\`, `;`, `,`, newline); every other value is written as given.
 
-### Low-Level API (Direct Object Creation)
+### The object model
 
-You can also create calendars directly using TypeScript objects:
+`VCalendar`, `VEvent`, `VTodo`, `VJournal`, `VFreeBusy`, `VTimezone` and `VAlarm` are plain TypeScript interfaces, one per component, each with a `component` discriminant (`"VEVENT"`, …). `VCalendar` holds the components in `timezones`, `events`, `todos`, `journals` and `freebusys`; events and to-dos hold their alarms in `alarms`.
 
-```typescript
-import { encodeSync } from "effect-ical";
-import type { VCalendar, VEvent } from "effect-ical";
+```ts
+import { encodeSync } from "@thomasfosterau/effect-ical";
+import type { VCalendar } from "@thomasfosterau/effect-ical";
 
 const calendar: VCalendar = {
   component: "VCALENDAR",
   version: "2.0",
-  prodid: "-//My Company//My Product//EN",
-  events: [
+  prodid: "-//Example Corp//Example App//EN",
+  todos: [
     {
-      component: "VEVENT",
-      uid: "event123",
-      dtstart: "20240101T120000Z",
-      dtend: "20240101T130000Z",
-      summary: "Team Meeting",
+      component: "VTODO",
+      uid: "proposal@example.com",
+      due: "20240205T170000Z",
+      summary: "Write the proposal",
+      status: "IN-PROCESS",
+      percent: 50,
       alarms: [
-        {
-          component: "VALARM",
-          action: "DISPLAY",
-          trigger: "-PT15M",
-          description: "Appointment reminder",
-        },
+        { component: "VALARM", action: "DISPLAY", trigger: "-PT1H", description: "Due soon" },
       ],
     },
   ],
 };
 
-const icalString = encodeSync(calendar);
+const text = encodeSync(calendar);
 ```
 
-### Working with Todos (Low-Level API)
+### Fluent builders
 
-```typescript
-import type { VTodo } from "effect-ical";
+`createCalendar(prodid)`, `createEvent()` and `createTodo()` return mutable builders (`CalendarBuilder`, `EventBuilder`, `TodoBuilder`) whose setters return the builder, so calls chain. `build()` returns the object model value; it throws a `BuildError` when an event has no `dtstart` or a calendar no `prodid`. `CalendarBuilder` also has `toICalString()` (via `encodeSync`) and `toICalEffect()` (via `encode`).
 
-const todo: VTodo = {
-  component: "VTODO",
-  uid: "todo789",
-  dtstart: "20240201T090000Z",
-  due: "20240205T170000Z",
-  summary: "Complete project documentation",
-  status: "IN-PROCESS",
-  percent: 50,
-  priority: 2,
-};
+```ts
+import { createCalendar, createEvent } from "@thomasfosterau/effect-ical";
+
+const text = createCalendar("-//Example Corp//Example App//EN")
+  .name("Work")
+  .event((e) =>
+    e
+      .uid("review@example.com")
+      .dtstart("20240115T140000Z")
+      .dtend("20240115T150000Z")
+      .summary("Code review")
+      .addAttendee("mailto:alice@example.com")
+      .addDisplayAlarm("-PT15M", "Review in 15 minutes"),
+  )
+  .todo((t) => t.uid("notes@example.com").summary("Send notes").priority(1))
+  .toICalString();
+
+const event = createEvent()
+  .uid("solo@example.com")
+  .dtstart("20240301T090000Z")
+  .summary("Focus time")
+  .build();
 ```
 
-### Complete Example
+Event setters: `uid`, `dtstart`, `dtend`, `duration`, `summary`, `description`, `location`, `organizer`, `addAttendee`, `attendees`, `categories`, `status`, `rrule`, `url`, `geo(lat, lon)`, `priority`, `classification`, `dtstamp`, `addAlarm`, `addDisplayAlarm(trigger, description?)`. To-do setters: `uid`, `dtstart`, `due`, `duration`, `summary`, `description`, `location`, `status`, `percentComplete` (clamped to 0–100), `completed`, `priority`, `dtstamp`, `rrule`, `addAlarm`. Calendar setters: `prodid`, `calscale`, `method`, `name`, `description`, `addEvent`, `event(fn)`, `addTodo`, `todo(fn)`, `addJournal`, `addTimezone`.
 
-```typescript
-import { parseEither, encodeSync } from "effect-ical";
-import type { VCalendar } from "effect-ical";
+### Pipeable modules: `Calendar`, `Event`, `Todo`
 
-// Parse an iCal file
-const icalInput = `...`; // Your iCal string
-const parseResult = parseEither(icalInput);
+Each module defines an Effect Schema class of the same name plus a `make` constructor and pipeable `with*` setters that return a new value.
 
-if (parseResult._tag === "Right") {
-  const calendar = parseResult.right;
-  
-  // Modify the calendar
-  if (calendar.events) {
-    calendar.events[0].summary = "Updated Meeting Title";
-  }
-  
-  // Encode back to iCal format
-  const icalOutput = encodeSync(calendar);
-  console.log(icalOutput);
-}
+```ts
+import { Calendar, Event, Todo } from "@thomasfosterau/effect-ical";
+import * as Effect from "effect/Effect";
+import { pipe } from "effect/Function";
+
+const standup = pipe(
+  Event.make("20240115T100000Z"),
+  Event.withUid("standup@example.com"),
+  Event.withSummary("Team standup"),
+  Event.withStatus("CONFIRMED"),
+);
+
+const proposal = pipe(Todo.make(), Todo.withSummary("Write the proposal"), Todo.withPercent(60));
+
+const calendar = pipe(
+  Calendar.builder(),
+  Calendar.withProdid("-//Example Corp//Example App//EN"),
+  Calendar.withName("Work"),
+  Calendar.withEvent(standup),
+  Calendar.withTodo(proposal),
+  Calendar.build,
+);
+
+const text = await Effect.runPromise(Calendar.encode(calendar));
 ```
 
-## Supported Components
+- `Event`: `make(dtstart)`, `withUid`, `withDtend`, `withDuration`, `withSummary`, `withDescription`, `withLocation`, `withOrganizer`, `withAttendee`, `withCategories`, `withStatus`, `withRrule`, `withUrl`, `withPriority`, `withClassification`, and `encode(event): Effect<Array<string>>` (the event's content lines, unescaped and unfolded).
+- `Todo`: `make()`, `withUid`, `withDtstart`, `withDue`, `withSummary`, `withDescription`, `withLocation`, `withStatus`, `withPercent` (clamped to 0–100), `withCompleted`, `withPriority`, `withRrule`, and `encode(todo): Effect<Array<string>>`.
+- `Calendar`: `make(prodid)`, `builder()`, `withProdid`, `withName`, `withDescription`, `withCalscale`, `withMethod`, `withEvent`, `withTodo`, `build`, and:
+  - `encode(calendar): Effect<string>`: a compact rendering. Values are not escaped or folded, and only an event's `DTSTART`, `UID`, `SUMMARY`, `DTEND`, `DESCRIPTION`, `LOCATION`, `STATUS` and a to-do's `UID`, `SUMMARY`, `DTSTART`, `DUE`, `STATUS`, `PERCENT-COMPLETE` are written. For complete output, use the root `encode` on a `VCalendar`.
+  - `decode(text): Effect<Calendar, ParseError>`: a shallow reader of the top-level `PRODID`, `VERSION`, `NAME`, `DESCRIPTION`, `CALSCALE` and `METHOD`. It does not unfold lines or read components, and a matching line inside a component also counts (the last one wins). For a full parse, use the root `parse`.
 
-- **VCALENDAR**: Top-level calendar container
-- **VEVENT**: Calendar events
-- **VTODO**: Todo items/tasks
-- **VJOURNAL**: Journal entries
-- **VFREEBUSY**: Free/busy time information
-- **VTIMEZONE**: Timezone definitions
-- **VALARM**: Alarms/reminders
+## Examples
 
-## RFC Compliance
+The repository's `examples/` directory has three runnable programs, one per API style; its test suite runs each of them.
 
-This library implements:
-- **RFC 5545**: Internet Calendaring and Scheduling Core Object Specification (iCalendar)
+## Standards
 
-Note: Updates from RFC 5546, RFC 6868, RFC 7529, and RFC 7986 are not yet fully implemented.
+Implements RFC 5545 content lines, components and escaping. Extensions from RFC 5546 (iTIP), RFC 6868 (parameter encoding), RFC 7529 (non-Gregorian recurrence) and RFC 7986 (new properties) are not implemented, though their properties pass through the parser as plain fields.
 
-## Development
+## Changelog
 
-```bash
-# Install dependencies
-bun install
-
-# Run tests
-bun test
-
-# Type check
-bun run typecheck
-
-# Build
-bun run build
-
-# Create a changeset
-bun run changeset
-```
-
-## API Reference
-
-### Types
-
-All component types are exported from the main module:
-- `VCalendar` - Main calendar object
-- `VEvent` - Event component
-- `VTodo` - Todo component
-- `VJournal` - Journal component
-- `VFreeBusy` - Free/busy component
-- `VTimezone` - Timezone component
-- `VAlarm` - Alarm component
-
-### Functions
-
-#### `parse(icalString: string): Effect<VCalendar, ParseError>`
-Parse an iCalendar string into a VCalendar object using Effect.
-
-#### `parseEither(icalString: string): Either<VCalendar, ParseError>`
-Parse an iCalendar string synchronously, returning Either.
-
-#### `encode(calendar: VCalendar): Effect<string, EncodeError>`
-Encode a VCalendar object into an iCalendar string using Effect.
-
-#### `encodeSync(calendar: VCalendar): string`
-Encode a VCalendar object into an iCalendar string synchronously.
+Release notes are in the package's `CHANGELOG.md`, written by Changesets.
 
 ## License
 
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+MIT. See the `LICENSE` file in the package.

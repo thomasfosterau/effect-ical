@@ -1,7 +1,9 @@
 /**
- * effect-ical - iCal (RFC 5545) library using Effect idioms
+ * iCalendar (RFC 5545) encoding and decoding for Effect: the plain object
+ * model with its parser and encoder, the fluent builders, and the pipeable
+ * `Calendar`, `Event` and `Todo` modules (exported as namespaces).
  *
- * This module exports the main API using Effect-style module namespaces.
+ * @module
  */
 
 export * as Calendar from "./Calendar.js";

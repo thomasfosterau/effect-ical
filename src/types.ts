@@ -1,9 +1,14 @@
 /**
- * Type definitions for iCalendar components following RFC 5545
+ * The plain iCalendar (RFC 5545) object model the parser produces and the
+ * encoder consumes: one interface per component, each with a `component`
+ * discriminant. Date, time, duration and recurrence values are RFC 5545
+ * strings, kept verbatim.
+ *
+ * @module
  */
 
 /**
- * Properties common to all components
+ * Properties every scheduling component (event, to-do, journal, free/busy) may carry.
  */
 export interface BaseProperties {
   /** Unique identifier for the component */
@@ -13,7 +18,7 @@ export interface BaseProperties {
 }
 
 /**
- * VEVENT component - Represents a scheduled event
+ * A `VEVENT` component: a scheduled event.
  */
 export interface VEvent extends BaseProperties {
   /** Component type identifier */
@@ -57,7 +62,7 @@ export interface VEvent extends BaseProperties {
 }
 
 /**
- * VTODO component - Represents an action-item or to-do
+ * A `VTODO` component: an action item.
  */
 export interface VTodo extends BaseProperties {
   /** Component type identifier */
@@ -89,7 +94,7 @@ export interface VTodo extends BaseProperties {
 }
 
 /**
- * VJOURNAL component - Represents a journal entry
+ * A `VJOURNAL` component: a journal entry.
  */
 export interface VJournal extends BaseProperties {
   /** Component type identifier */
@@ -107,7 +112,7 @@ export interface VJournal extends BaseProperties {
 }
 
 /**
- * VFREEBUSY component - Represents free or busy time information
+ * A `VFREEBUSY` component: free or busy time information.
  */
 export interface VFreeBusy extends BaseProperties {
   /** Component type identifier */
@@ -130,7 +135,7 @@ export interface VFreeBusy extends BaseProperties {
 }
 
 /**
- * VTIMEZONE component - Represents timezone information
+ * A `VTIMEZONE` component: a time zone definition, with its standard and daylight observances.
  */
 export interface VTimezone {
   /** Component type identifier */
@@ -160,7 +165,7 @@ export interface VTimezone {
 }
 
 /**
- * VALARM component - Represents an alarm/reminder
+ * A `VALARM` component: a reminder attached to an event or to-do.
  */
 export interface VAlarm {
   /** Component type identifier */
@@ -184,12 +189,12 @@ export interface VAlarm {
 }
 
 /**
- * Component union type
+ * Any component a `VCALENDAR` can hold directly.
  */
 export type Component = VEvent | VTodo | VJournal | VFreeBusy | VTimezone;
 
 /**
- * VCALENDAR - The top-level iCalendar object
+ * A `VCALENDAR` object: the top-level iCalendar container.
  */
 export interface VCalendar {
   /** Component type identifier */
