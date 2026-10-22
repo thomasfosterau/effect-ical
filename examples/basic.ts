@@ -2,9 +2,8 @@
  * The plain object model: encode a `VCalendar` with `encodeSync`, parse text
  * back with `parse`, and round-trip a calendar.
  *
- * Run from the repo root with `vp run examples` (every example) or
- * `vp exec tsx examples/basic.ts`; `vp run check` type-checks it against the
- * current API.
+ * `tests/examples.test.ts` runs it (with `vp run test:unit`), so it is proved
+ * to run against the current API.
  */
 
 import * as Console from "effect/Console";
@@ -12,7 +11,8 @@ import * as Effect from "effect/Effect";
 import { encodeSync, parse } from "../src/index.js";
 import type { VCalendar, VEvent } from "../src/index.js";
 
-const main = Effect.fn("examples/basic")(function* () {
+/** Runs this example, logging through the `Console` service. */
+export const main = Effect.fn("examples/basic")(function* () {
   yield* Console.log("=== Example 1: Creating a simple event ===\n");
 
   // Create a simple calendar with an event
@@ -172,6 +172,3 @@ const main = Effect.fn("examples/basic")(function* () {
     `  Event summary preserved: ${decoded.events?.[0]?.summary === originalCal.events?.[0]?.summary}`,
   );
 });
-
-// The entrypoint: the one place this script runs an Effect.
-Effect.runPromise(main());

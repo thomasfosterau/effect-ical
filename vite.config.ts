@@ -126,12 +126,6 @@ export default defineConfig({
         command: "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
         cache: { input: cacheInputs, output: [] },
       },
-      // Runs every example script under `examples/` (tsx), so the scripts the
-      // README points at are proved to run, not only to type-check.
-      examples: {
-        command: "tsx examples/basic.ts && tsx examples/builder.ts && tsx examples/effect-api.ts",
-        cache: { input: cacheInputs, output: [] },
-      },
       // The published artifact: one ESM bundle + declaration file
       // (`vp pack` → tsdown). `sideEffects: false` is a claim about this
       // output: no top-level statements.
@@ -185,15 +179,20 @@ export default defineConfig({
       // reads (see `test:coverage` above).
       reporter: ["text-summary", "json-summary", "json"],
       reportsDirectory: "./coverage",
-      include: ["src/**/*.ts"],
+      // `examples/` is measured too (tests/examples.test.ts runs every
+      // example), so fallow scores the examples' complexity against real
+      // coverage. The thresholds below bind the published `src/` per glob.
+      include: ["src/**/*.ts", "examples/**/*.ts"],
       exclude: ["**/*.d.ts"],
       // effect-web's thresholds, the family standard. Never lower one to make
       // a change pass: add the tests instead.
       thresholds: {
-        lines: 90,
-        branches: 85,
-        functions: 90,
-        statements: 90,
+        "src/**": {
+          lines: 90,
+          branches: 85,
+          functions: 90,
+          statements: 90,
+        },
       },
     },
   },

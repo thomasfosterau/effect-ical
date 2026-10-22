@@ -9,6 +9,9 @@
  * @module
  */
 
+// The barrel re-exports this module only as a namespace (`export * as Event`),
+// so its setter and `encode` names never collide with a sibling module's.
+// fallow-ignore-file duplicate-export
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

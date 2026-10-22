@@ -199,3 +199,95 @@ describe("Effect-style API", () => {
     });
   });
 });
+
+describe("Event.encode and Todo.encode", () => {
+  it("writes every set property of an event, in order", async () => {
+    const event = pipe(
+      Event.make("20240101T120000Z"),
+      Event.withUid("e1"),
+      Event.withDtend("20240101T130000Z"),
+      Event.withDuration("PT1H"),
+      Event.withSummary("Summary"),
+      Event.withDescription("Description"),
+      Event.withLocation("Room"),
+      Event.withOrganizer("mailto:org@example.com"),
+      Event.withAttendee("mailto:a@example.com"),
+      Event.withCategories(["A", "B"]),
+      Event.withStatus("CONFIRMED"),
+      Event.withRrule("FREQ=DAILY"),
+      Event.withUrl("https://example.com"),
+      Event.withPriority(0),
+      Event.withClassification("PUBLIC"),
+    );
+    const lines = await runTest(Event.encode({ ...event, dtstamp: "20240101T000000Z" }));
+    expect(lines).toEqual([
+      "BEGIN:VEVENT",
+      "DTSTART:20240101T120000Z",
+      "UID:e1",
+      "DTSTAMP:20240101T000000Z",
+      "DTEND:20240101T130000Z",
+      "DURATION:PT1H",
+      "SUMMARY:Summary",
+      "DESCRIPTION:Description",
+      "LOCATION:Room",
+      "ORGANIZER:mailto:org@example.com",
+      "ATTENDEE:mailto:a@example.com",
+      "CATEGORIES:A,B",
+      "STATUS:CONFIRMED",
+      "RRULE:FREQ=DAILY",
+      "URL:https://example.com",
+      "PRIORITY:0",
+      "CLASS:PUBLIC",
+      "END:VEVENT",
+    ]);
+  });
+
+  it("writes only DTSTART for a bare event", async () => {
+    expect(await runTest(Event.encode(Event.make("20240101")))).toEqual([
+      "BEGIN:VEVENT",
+      "DTSTART:20240101",
+      "END:VEVENT",
+    ]);
+  });
+
+  it("writes every set property of a to-do, in order", async () => {
+    const todo = pipe(
+      Todo.make(),
+      Todo.withUid("t1"),
+      Todo.withDtstart("20240101"),
+      Todo.withDue("20240102"),
+      Todo.withSummary("Todo"),
+      Todo.withDescription("Description"),
+      Todo.withLocation("Desk"),
+      Todo.withStatus("COMPLETED"),
+      Todo.withPercent(100),
+      Todo.withCompleted("20240102"),
+      Todo.withPriority(1),
+      Todo.withRrule("FREQ=WEEKLY"),
+    );
+    const lines = await runTest(
+      Todo.encode({ ...todo, dtstamp: "20240101T000000Z", duration: "P1D" }),
+    );
+    expect(lines).toEqual([
+      "BEGIN:VTODO",
+      "UID:t1",
+      "DTSTAMP:20240101T000000Z",
+      "DTSTART:20240101",
+      "DUE:20240102",
+      "DURATION:P1D",
+      "SUMMARY:Todo",
+      "DESCRIPTION:Description",
+      "LOCATION:Desk",
+      "STATUS:COMPLETED",
+      "PERCENT-COMPLETE:100",
+      "COMPLETED:20240102",
+      "PRIORITY:1",
+      "RRULE:FREQ=WEEKLY",
+      "END:VTODO",
+    ]);
+  });
+
+  it("writes nothing but the delimiters for a bare to-do", async () => {
+    expect(await runTest(Todo.encode(Todo.make()))).toEqual(["BEGIN:VTODO", "END:VTODO"]);
+  });
+});

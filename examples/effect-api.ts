@@ -1,9 +1,8 @@
 /**
  * The pipeable `Calendar`, `Event` and `Todo` modules.
  *
- * Run from the repo root with `vp run examples` (every example) or
- * `vp exec tsx examples/effect-api.ts`; `vp run check` type-checks it against the
- * current API.
+ * `tests/examples.test.ts` runs it (with `vp run test:unit`), so it is proved
+ * to run against the current API.
  */
 
 import * as Console from "effect/Console";
@@ -11,7 +10,8 @@ import * as Effect from "effect/Effect";
 import { pipe } from "effect/Function";
 import { Calendar, Event, Todo, parse } from "../src/index.js";
 
-const main = Effect.fn("examples/effect-api")(function* () {
+/** Runs this example, logging through the `Console` service. */
+export const main = Effect.fn("examples/effect-api")(function* () {
   yield* Console.log("=== Example 1: Creating a calendar with Calendar.make() ===\n");
 
   const simpleCalendar = Calendar.make("-//My Company//My App//EN");
@@ -138,6 +138,3 @@ const main = Effect.fn("examples/effect-api")(function* () {
 
   yield* Console.log("\n✨ Effect-style API provides composable, type-safe calendar operations!");
 });
-
-// The entrypoint: the one place this script runs an Effect.
-Effect.runPromise(main());

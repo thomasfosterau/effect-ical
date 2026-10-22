@@ -47,9 +47,6 @@ catalog:
   # Claude Code PreToolUse hook `.claude/hooks/fallow-gate.sh` runs
   # `fallow audit` before every agent `git commit` / `git push`).
   fallow: 3.34.1
-  # Runs the example scripts (`vp run examples`), so CI proves they still run
-  # against the current API, not only that they type-check.
-  tsx: ^4.23.15
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
   # until 7.1, so JS-API consumers (@effect/language-service, tsdown's
   # declaration bundler behind `vp pack`) stay on TS6 while native `tsc`

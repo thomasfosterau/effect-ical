@@ -1,16 +1,16 @@
 /**
  * The fluent builder API: `createCalendar`, `createEvent` and `createTodo`.
  *
- * Run from the repo root with `vp run examples` (every example) or
- * `vp exec tsx examples/builder.ts`; `vp run check` type-checks it against the
- * current API.
+ * `tests/examples.test.ts` runs it (with `vp run test:unit`), so it is proved
+ * to run against the current API.
  */
 
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import { createCalendar, createEvent, createTodo } from "../src/index.js";
 
-const main = Effect.fn("examples/builder")(function* () {
+/** Runs this example, logging through the `Console` service. */
+export const main = Effect.fn("examples/builder")(function* () {
   yield* Console.log("=== Example 1: Creating a calendar with events using builder ===\n");
 
   const calendar1 = createCalendar("-//My Company//My App//EN")
@@ -214,6 +214,3 @@ const main = Effect.fn("examples/builder")(function* () {
 
   yield* Console.log("✨ Builder API provides a clean, fluent interface for creating calendars!");
 });
-
-// The entrypoint: the one place this script runs an Effect.
-Effect.runPromise(main());

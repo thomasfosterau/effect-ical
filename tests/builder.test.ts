@@ -210,19 +210,17 @@ describe("Builder API", () => {
       expect(calendar.name).toBe("Test Calendar");
       expect(calendar.calscale).toBe("GREGORIAN");
 
-      expect(calendar.events?.length).toBe(1);
-      const event = calendar.events?.[0];
-      expect(event?.uid).toBe("event-123");
-      expect(event?.summary).toBe("Team Meeting");
-      expect(event?.description).toBe("Weekly sync");
-      expect(event?.status).toBe("CONFIRMED");
-
-      expect(calendar.todos?.length).toBe(1);
-      const todo = calendar.todos?.[0];
-      expect(todo?.uid).toBe("todo-456");
-      expect(todo?.summary).toBe("Review PR");
-      expect(todo?.status).toBe("IN-PROCESS");
-      expect(todo?.percent).toBe(75);
+      expect(calendar.events).toMatchObject([
+        {
+          uid: "event-123",
+          summary: "Team Meeting",
+          description: "Weekly sync",
+          status: "CONFIRMED",
+        },
+      ]);
+      expect(calendar.todos).toMatchObject([
+        { uid: "todo-456", summary: "Review PR", status: "IN-PROCESS", percent: 75 },
+      ]);
     });
   });
 
