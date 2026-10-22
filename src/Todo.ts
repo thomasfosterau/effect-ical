@@ -1,12 +1,22 @@
 /**
- * Todo module - Effect-style API for iCalendar VTODO components
+ * Pipeable constructors and setters for iCalendar `VTODO` components, as an
+ * Effect Schema class.
+ *
+ * Start from `Todo.make()` and pipe setters (`Todo.withSummary`,
+ * `Todo.withDue`, …); each returns a new to-do and leaves its input
+ * untouched. `Todo.encode` renders the to-do's content lines.
+ *
+ * @module
  */
 
-import { Effect } from "effect";
+// The barrel re-exports this module only as a namespace (`export * as Todo`),
+// so its setter and `encode` names never collide with a sibling module's.
+// fallow-ignore-file duplicate-export
+import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 /**
- * Todo Schema - represents a VTODO component
+ * A `VTODO` component: an action item, as an Effect Schema class.
  */
 export class Todo extends Schema.Class<Todo>("Todo")({
   component: Schema.Literal("VTODO"),
@@ -19,7 +29,7 @@ export class Todo extends Schema.Class<Todo>("Todo")({
   description: Schema.optional(Schema.String),
   location: Schema.optional(Schema.String),
   status: Schema.optional(
-    Schema.Literal("NEEDS-ACTION", "COMPLETED", "IN-PROCESS", "CANCELLED")
+    Schema.Literals(["NEEDS-ACTION", "COMPLETED", "IN-PROCESS", "CANCELLED"]),
   ),
   percent: Schema.optional(Schema.Number),
   completed: Schema.optional(Schema.String),
@@ -28,7 +38,7 @@ export class Todo extends Schema.Class<Todo>("Todo")({
 }) {}
 
 /**
- * Create a new Todo
+ * Create an empty to-do.
  */
 export const make = (): Todo => {
   return new Todo({
@@ -37,55 +47,67 @@ export const make = (): Todo => {
 };
 
 /**
- * Set UID
+ * Return a copy of the to-do with its unique identifier (`UID`) set.
  */
-export const withUid = (uid: string) => (todo: Todo): Todo => ({
-  ...todo,
-  uid,
-});
+export const withUid =
+  (uid: string) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    uid,
+  });
 
 /**
- * Set DTSTART
+ * Return a copy of the to-do with its start (`DTSTART`) set.
  */
-export const withDtstart = (dtstart: string) => (todo: Todo): Todo => ({
-  ...todo,
-  dtstart,
-});
+export const withDtstart =
+  (dtstart: string) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    dtstart,
+  });
 
 /**
- * Set DUE
+ * Return a copy of the to-do with its due date (`DUE`) set.
  */
-export const withDue = (due: string) => (todo: Todo): Todo => ({
-  ...todo,
-  due,
-});
+export const withDue =
+  (due: string) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    due,
+  });
 
 /**
- * Set summary
+ * Return a copy of the to-do with its summary (`SUMMARY`) set.
  */
-export const withSummary = (summary: string) => (todo: Todo): Todo => ({
-  ...todo,
-  summary,
-});
+export const withSummary =
+  (summary: string) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    summary,
+  });
 
 /**
- * Set description
+ * Return a copy of the to-do with its description (`DESCRIPTION`) set.
  */
-export const withDescription = (description: string) => (todo: Todo): Todo => ({
-  ...todo,
-  description,
-});
+export const withDescription =
+  (description: string) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    description,
+  });
 
 /**
- * Set location
+ * Return a copy of the to-do with its location (`LOCATION`) set.
  */
-export const withLocation = (location: string) => (todo: Todo): Todo => ({
-  ...todo,
-  location,
-});
+export const withLocation =
+  (location: string) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    location,
+  });
 
 /**
- * Set status
+ * Return a copy of the to-do with its status (`STATUS`) set.
  */
 export const withStatus =
   (status: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED") =>
@@ -95,62 +117,71 @@ export const withStatus =
   });
 
 /**
- * Set percent complete (0-100)
+ * Return a copy of the to-do with its completion (`PERCENT-COMPLETE`) set, clamped to 0–100.
  */
-export const withPercent = (percent: number) => (todo: Todo): Todo => ({
-  ...todo,
-  percent: Math.max(0, Math.min(100, percent)),
-});
-
-/**
- * Set completed date
- */
-export const withCompleted = (completed: string) => (todo: Todo): Todo => ({
-  ...todo,
-  completed,
-});
-
-/**
- * Set priority
- */
-export const withPriority = (priority: number) => (todo: Todo): Todo => ({
-  ...todo,
-  priority,
-});
-
-/**
- * Set recurrence rule
- */
-export const withRrule = (rrule: string) => (todo: Todo): Todo => ({
-  ...todo,
-  rrule,
-});
-
-/**
- * Encode a todo to iCal format lines
- */
-export const encode = (todo: Todo): Effect.Effect<string[], Error> => {
-  return Effect.gen(function* () {
-    const lines: string[] = [];
-
-    lines.push("BEGIN:VTODO");
-
-    if (todo.uid) lines.push(`UID:${todo.uid}`);
-    if (todo.dtstamp) lines.push(`DTSTAMP:${todo.dtstamp}`);
-    if (todo.dtstart) lines.push(`DTSTART:${todo.dtstart}`);
-    if (todo.due) lines.push(`DUE:${todo.due}`);
-    if (todo.duration) lines.push(`DURATION:${todo.duration}`);
-    if (todo.summary) lines.push(`SUMMARY:${todo.summary}`);
-    if (todo.description) lines.push(`DESCRIPTION:${todo.description}`);
-    if (todo.location) lines.push(`LOCATION:${todo.location}`);
-    if (todo.status) lines.push(`STATUS:${todo.status}`);
-    if (todo.percent !== undefined) lines.push(`PERCENT-COMPLETE:${todo.percent}`);
-    if (todo.completed) lines.push(`COMPLETED:${todo.completed}`);
-    if (todo.priority !== undefined) lines.push(`PRIORITY:${todo.priority}`);
-    if (todo.rrule) lines.push(`RRULE:${todo.rrule}`);
-
-    lines.push("END:VTODO");
-
-    return lines;
+export const withPercent =
+  (percent: number) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    percent: Math.max(0, Math.min(100, percent)),
   });
-};
+
+/**
+ * Return a copy of the to-do with its completion time (`COMPLETED`) set.
+ */
+export const withCompleted =
+  (completed: string) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    completed,
+  });
+
+/**
+ * Return a copy of the to-do with its priority (`PRIORITY`: 0 undefined, 1 highest, 9 lowest) set.
+ */
+export const withPriority =
+  (priority: number) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    priority,
+  });
+
+/**
+ * Return a copy of the to-do with its recurrence rule (`RRULE`) set.
+ */
+export const withRrule =
+  (rrule: string) =>
+  (todo: Todo): Todo => ({
+    ...todo,
+    rrule,
+  });
+
+/**
+ * Render a to-do as its iCalendar content lines, from `BEGIN:VTODO` to
+ * `END:VTODO`.
+ *
+ * Values are written verbatim: no escaping and no line folding (the
+ * `encode` function at the package root does both, for a whole calendar).
+ * Empty optional strings are omitted; `percent` and `priority` are written
+ * whenever they are set, including `0`.
+ *
+ * @category encoding
+ */
+export const encode = (todo: Todo): Effect.Effect<Array<string>> =>
+  Effect.sync(() => [
+    "BEGIN:VTODO",
+    ...(todo.uid ? [`UID:${todo.uid}`] : []),
+    ...(todo.dtstamp ? [`DTSTAMP:${todo.dtstamp}`] : []),
+    ...(todo.dtstart ? [`DTSTART:${todo.dtstart}`] : []),
+    ...(todo.due ? [`DUE:${todo.due}`] : []),
+    ...(todo.duration ? [`DURATION:${todo.duration}`] : []),
+    ...(todo.summary ? [`SUMMARY:${todo.summary}`] : []),
+    ...(todo.description ? [`DESCRIPTION:${todo.description}`] : []),
+    ...(todo.location ? [`LOCATION:${todo.location}`] : []),
+    ...(todo.status ? [`STATUS:${todo.status}`] : []),
+    ...(todo.percent === undefined ? [] : [`PERCENT-COMPLETE:${todo.percent}`]),
+    ...(todo.completed ? [`COMPLETED:${todo.completed}`] : []),
+    ...(todo.priority === undefined ? [] : [`PRIORITY:${todo.priority}`]),
+    ...(todo.rrule ? [`RRULE:${todo.rrule}`] : []),
+    "END:VTODO",
+  ]);

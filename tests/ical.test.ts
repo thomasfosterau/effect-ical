@@ -2,8 +2,9 @@
  * Tests for the iCalendar encoder and parser
  */
 
-import { describe, it, expect } from "bun:test";
-import { parseEither } from "../src/parser";
+import { assert, describe, expect, it } from "vite-plus/test";
+import * as Result from "effect/Result";
+import { parseResult } from "../src/parser";
 import { encodeSync } from "../src/encoder";
 import type { VCalendar, VEvent } from "../src/types";
 
@@ -15,15 +16,12 @@ PRODID:-//Test//Test//EN
 END:VCALENDAR
 `;
 
-    const result = parseEither(ical);
-    expect(result._tag).toBe("Right");
-    
-    if (result._tag === "Right") {
-      const calendar = result.right;
-      expect(calendar.component).toBe("VCALENDAR");
-      expect(calendar.version).toBe("2.0");
-      expect(calendar.prodid).toBe("-//Test//Test//EN");
-    }
+    const result = parseResult(ical);
+    assert(Result.isSuccess(result));
+    const calendar = result.success;
+    expect(calendar.component).toBe("VCALENDAR");
+    expect(calendar.version).toBe("2.0");
+    expect(calendar.prodid).toBe("-//Test//Test//EN");
   });
 
   it("should parse a VCALENDAR with VEVENT", () => {
@@ -41,22 +39,19 @@ END:VEVENT
 END:VCALENDAR
 `;
 
-    const result = parseEither(ical);
-    expect(result._tag).toBe("Right");
+    const result = parseResult(ical);
+    assert(Result.isSuccess(result));
+    const calendar = result.success;
+    expect(calendar.events).toBeDefined();
+    expect(calendar.events?.length).toBe(1);
 
-    if (result._tag === "Right") {
-      const calendar = result.right;
-      expect(calendar.events).toBeDefined();
-      expect(calendar.events?.length).toBe(1);
-      
-      const event = calendar.events?.[0];
-      expect(event?.uid).toBe("event123");
-      expect(event?.dtstart).toBe("20240101T120000Z");
-      expect(event?.dtend).toBe("20240101T130000Z");
-      expect(event?.summary).toBe("Test Event");
-      expect(event?.description).toBe("This is a test event");
-      expect(event?.location).toBe("Test Location");
-    }
+    const event = calendar.events?.[0];
+    expect(event?.uid).toBe("event123");
+    expect(event?.dtstart).toBe("20240101T120000Z");
+    expect(event?.dtend).toBe("20240101T130000Z");
+    expect(event?.summary).toBe("Test Event");
+    expect(event?.description).toBe("This is a test event");
+    expect(event?.location).toBe("Test Location");
   });
 
   it("should parse folded lines correctly", () => {
@@ -72,13 +67,12 @@ END:VEVENT
 END:VCALENDAR
 `;
 
-    const result = parseEither(ical);
-    expect(result._tag).toBe("Right");
-
-    if (result._tag === "Right") {
-      const event = result.right.events?.[0];
-      expect(event?.summary).toBe("This is a very long summary that has been folded according to RFC 5545 line folding rules");
-    }
+    const result = parseResult(ical);
+    assert(Result.isSuccess(result));
+    const event = result.success.events?.[0];
+    expect(event?.summary).toBe(
+      "This is a very long summary that has been folded according to RFC 5545 line folding rules",
+    );
   });
 
   it("should parse multiple events", () => {
@@ -98,15 +92,12 @@ END:VEVENT
 END:VCALENDAR
 `;
 
-    const result = parseEither(ical);
-    expect(result._tag).toBe("Right");
-
-    if (result._tag === "Right") {
-      const calendar = result.right;
-      expect(calendar.events?.length).toBe(2);
-      expect(calendar.events?.[0]?.uid).toBe("event1");
-      expect(calendar.events?.[1]?.uid).toBe("event2");
-    }
+    const result = parseResult(ical);
+    assert(Result.isSuccess(result));
+    const calendar = result.success;
+    expect(calendar.events?.length).toBe(2);
+    expect(calendar.events?.[0]?.uid).toBe("event1");
+    expect(calendar.events?.[1]?.uid).toBe("event2");
   });
 
   it("should parse events with alarms", () => {
@@ -126,16 +117,13 @@ END:VEVENT
 END:VCALENDAR
 `;
 
-    const result = parseEither(ical);
-    expect(result._tag).toBe("Right");
-
-    if (result._tag === "Right") {
-      const event = result.right.events?.[0];
-      expect(event?.alarms).toBeDefined();
-      expect(event?.alarms?.length).toBe(1);
-      expect(event?.alarms?.[0]?.action).toBe("DISPLAY");
-      expect(event?.alarms?.[0]?.trigger).toBe("-PT15M");
-    }
+    const result = parseResult(ical);
+    assert(Result.isSuccess(result));
+    const event = result.success.events?.[0];
+    expect(event?.alarms).toBeDefined();
+    expect(event?.alarms?.length).toBe(1);
+    expect(event?.alarms?.[0]?.action).toBe("DISPLAY");
+    expect(event?.alarms?.[0]?.trigger).toBe("-PT15M");
   });
 
   it("should fail on invalid iCalendar (missing VERSION)", () => {
@@ -144,8 +132,7 @@ PRODID:-//Test//Test//EN
 END:VCALENDAR
 `;
 
-    const result = parseEither(ical);
-    expect(result._tag).toBe("Left");
+    expect(Result.isFailure(parseResult(ical))).toBe(true);
   });
 
   it("should fail on invalid iCalendar (missing PRODID)", () => {
@@ -154,8 +141,7 @@ VERSION:2.0
 END:VCALENDAR
 `;
 
-    const result = parseEither(ical);
-    expect(result._tag).toBe("Left");
+    expect(Result.isFailure(parseResult(ical))).toBe(true);
   });
 });
 
@@ -208,7 +194,8 @@ describe("iCalendar Encoder", () => {
       component: "VEVENT",
       uid: "long-event-123",
       dtstart: "20240101T120000Z",
-      summary: "This is a very long summary that should be folded according to RFC 5545 line folding rules to ensure proper formatting",
+      summary:
+        "This is a very long summary that should be folded according to RFC 5545 line folding rules to ensure proper formatting",
     };
 
     const calendar: VCalendar = {
@@ -219,15 +206,10 @@ describe("iCalendar Encoder", () => {
     };
 
     const ical = encodeSync(calendar);
+    // No physical line exceeds 75 octets; continuation lines start with a space.
     const lines = ical.split("\r\n");
-    
-    // Check that no line exceeds 75 characters (except continuation lines)
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line && !line.startsWith(" ")) {
-        expect(line.length).toBeLessThanOrEqual(75);
-      }
-    }
+    expect(lines.filter((line) => line.length > 75)).toEqual([]);
+    expect(lines.filter((line) => line.startsWith(" ")).length).toBeGreaterThan(0);
   });
 
   it("should escape special characters", () => {
@@ -300,17 +282,14 @@ describe("Round-trip encoding and parsing", () => {
     };
 
     const encoded = encodeSync(original);
-    const result = parseEither(encoded);
-
-    expect(result._tag).toBe("Right");
-    if (result._tag === "Right") {
-      const parsed = result.right;
-      expect(parsed.version).toBe(original.version);
-      expect(parsed.prodid).toBe(original.prodid);
-      expect(parsed.events?.length).toBe(1);
-      expect(parsed.events?.[0]?.uid).toBe("event123");
-      expect(parsed.events?.[0]?.summary).toBe("Test Event");
-    }
+    const result = parseResult(encoded);
+    assert(Result.isSuccess(result));
+    const parsed = result.success;
+    expect(parsed.version).toBe(original.version);
+    expect(parsed.prodid).toBe(original.prodid);
+    expect(parsed.events?.length).toBe(1);
+    expect(parsed.events?.[0]?.uid).toBe("event123");
+    expect(parsed.events?.[0]?.summary).toBe("Test Event");
   });
 
   it("should round-trip a complex calendar with multiple components", () => {
@@ -359,17 +338,14 @@ describe("Round-trip encoding and parsing", () => {
     };
 
     const encoded = encodeSync(original);
-    const result = parseEither(encoded);
-
-    expect(result._tag).toBe("Right");
-    if (result._tag === "Right") {
-      const parsed = result.right;
-      expect(parsed.version).toBe(original.version);
-      expect(parsed.prodid).toBe(original.prodid);
-      expect(parsed.calscale).toBe(original.calscale);
-      expect(parsed.name).toBe(original.name);
-      expect(parsed.events?.length).toBe(2);
-      expect(parsed.todos?.length).toBe(1);
-    }
+    const result = parseResult(encoded);
+    assert(Result.isSuccess(result));
+    const parsed = result.success;
+    expect(parsed.version).toBe(original.version);
+    expect(parsed.prodid).toBe(original.prodid);
+    expect(parsed.calscale).toBe(original.calscale);
+    expect(parsed.name).toBe(original.name);
+    expect(parsed.events?.length).toBe(2);
+    expect(parsed.todos?.length).toBe(1);
   });
 });

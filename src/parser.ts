@@ -1,367 +1,381 @@
 /**
- * Parser for iCalendar format (RFC 5545) using Effect idioms
+ * Parse iCalendar (RFC 5545) text into the plain {@link Types.VCalendar}
+ * object model.
+ *
+ * The parser is a pure function returning a `Result` (`parseResult`), with an
+ * `Effect` wrapper (`parse`) for use inside Effect programs. Content lines are
+ * unfolded (RFC 5545 §3.1), property names are lower-cased into field names,
+ * and `ATTENDEE`, `CATEGORIES`, `RDATE` and `EXDATE` collect into arrays.
+ * Values are kept verbatim: text is not unescaped and dates are not decoded.
+ *
+ * @module
  */
 
-import { Effect, Either } from "effect";
+import * as Arr from "effect/Array";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import * as Str from "effect/String";
 import type * as Types from "./types.js";
 
 /**
- * Parse errors
+ * The parser's failure: the input is not a well-formed `VCALENDAR` (no
+ * calendar, an unclosed calendar, a line without a `:`, or a missing or wrong
+ * `VERSION` / `PRODID`). `message` says which.
+ *
+ * @category errors
  */
-export class ParseError {
-  readonly _tag = "ParseError";
-  constructor(readonly message: string) {}
+export class ParseError extends Schema.TaggedError<ParseError>()("ParseError", {
+  message: Schema.String,
+}) {}
+
+/** One content line: `NAME[;PARAM=VALUE]*:VALUE`, with the name upper-cased. */
+interface ContentLine {
+  readonly name: string;
+  readonly value: string;
 }
 
-/**
- * Unfold lines according to RFC 5545 (3.1)
- * Long content lines are split into multiple lines with a space or tab continuation
- */
-const unfoldLines = (text: string): string[] => {
-  const lines = text.split(/\r?\n/);
-  const unfolded: string[] = [];
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line) continue;
-    
-    // Check if next line is a continuation (starts with space or tab)
-    if (unfolded.length > 0 && (line[0] === ' ' || line[0] === '\t')) {
-      // Continuation line - append to previous (removing the leading whitespace)
-      unfolded[unfolded.length - 1] += line.slice(1);
-    } else {
-      unfolded.push(line);
-    }
-  }
-  
-  return unfolded;
-};
+/** A property value as the parser produces it. */
+type PropertyValue = string | number | ReadonlyArray<string | number>;
+
+/** A parsed component: its properties by field name, plus sub-component fields. */
+type RawComponent = Readonly<Record<string, PropertyValue | ReadonlyArray<RawComponent>>>;
+
+/** A parsed component, its direct children and the index of its `END` line. */
+interface ParsedComponent {
+  readonly component: RawComponent;
+  readonly componentType: string;
+  readonly children: ReadonlyArray<ParsedComponent>;
+  readonly endIndex: number;
+}
+
+/** One step of the line scanner inside a component. */
+type Step = Data.TaggedEnum<{
+  Property: { readonly line: ContentLine };
+  Child: { readonly parsed: ParsedComponent };
+  Close: { readonly index: number };
+  Fail: { readonly error: ParseError };
+}>;
+
+const Step = Data.taggedEnum<Step>();
+
+const isContinuation = (line: string): boolean => line.startsWith(" ") || line.startsWith("\t");
 
 /**
- * Parse a content line into name, parameters, and value
+ * Unfold lines according to RFC 5545 §3.1: a line that starts with a space or
+ * tab continues the previous non-empty line (minus that one whitespace
+ * character). Empty lines are dropped; a continuation with nothing before it
+ * stays a line of its own.
  */
-const parseContentLine = (
-  line: string
-): Either.Either<{ name: string; params: Record<string, string>; value: string }, ParseError> => {
-  // Format: name[;param=value]*:value
+const unfoldLines = (text: string): ReadonlyArray<string> => {
+  const lines = Arr.filter(text.split(/\r?\n/), Str.isNonEmpty);
+  const starts = Arr.filterMap(lines, (line, index) =>
+    index === 0 || !isContinuation(line) ? Result.succeed(index) : Result.failVoid,
+  );
+  const ends = Arr.append(Arr.drop(starts, 1), lines.length);
+  return Arr.map(Arr.zip(starts, ends), ([start, end]) =>
+    Arr.join(
+      Arr.map(lines.slice(start, end), (line, offset) => (offset === 0 ? line : line.slice(1))),
+      "",
+    ),
+  );
+};
+
+/** Parse a content line into its upper-cased name and its value. */
+const parseContentLine = (line: string): Result.Result<ContentLine, ParseError> => {
   const colonIndex = line.indexOf(":");
-  if (colonIndex === -1) {
-    return Either.left(new ParseError(`Invalid content line: ${line}`));
-  }
-
-  const nameAndParams = line.slice(0, colonIndex);
-  const value = line.slice(colonIndex + 1);
-
-  // Parse name and parameters
-  const parts = nameAndParams.split(";");
-  const name = parts[0]!.toUpperCase();
-  const params: Record<string, string> = {};
-
-  for (let i = 1; i < parts.length; i++) {
-    const param = parts[i]!;
-    const eqIndex = param.indexOf("=");
-    if (eqIndex !== -1) {
-      const paramName = param.slice(0, eqIndex).toUpperCase();
-      let paramValue = param.slice(eqIndex + 1);
-      // Remove quotes if present
-      if (paramValue.startsWith('"') && paramValue.endsWith('"')) {
-        paramValue = paramValue.slice(1, -1);
-      }
-      params[paramName] = paramValue;
-    }
-  }
-
-  return Either.right({ name, params, value });
+  return colonIndex === -1
+    ? Result.fail(new ParseError({ message: `Invalid content line: ${line}` }))
+    : Result.succeed({
+        name: Str.toUpperCase(line.slice(0, colonIndex).split(";")[0] ?? ""),
+        value: line.slice(colonIndex + 1),
+      });
 };
 
-/**
- * Map RFC property names to camelCase field names
- */
-const propertyNameMap: Record<string, string> = {
+/** RFC property names whose field name is not simply the lower-cased name. */
+const propertyNameMap: Readonly<Record<string, string>> = {
   "PERCENT-COMPLETE": "percent",
   "LAST-MODIFIED": "lastmod",
-  "TZOFFSETFROM": "tzoffsetfrom",
-  "TZOFFSETTO": "tzoffsetto",
-  "TZNAME": "tzname",
 };
 
-/**
- * Properties that should be parsed as numbers
- */
-const numericProperties = new Set(["PERCENT", "PERCENT-COMPLETE", "PRIORITY", "REPEAT", "SEQUENCE"]);
+/** Properties whose value is parsed as an integer (kept as text if it is not one). */
+const numericProperties = [
+  "PERCENT",
+  "PERCENT-COMPLETE",
+  "PRIORITY",
+  "REPEAT",
+  "SEQUENCE",
+] as const;
 
-/**
- * Normalize property name to field name
- */
-const normalizePropertyName = (name: string): string => {
-  return propertyNameMap[name] || name.toLowerCase();
-};
+/** Properties that may repeat, collected into an array in order. */
+const arrayProperties = ["ATTENDEE", "CATEGORIES", "RDATE", "EXDATE"] as const;
 
-/**
- * Parse property value based on its type
- */
-const parsePropertyValue = (name: string, value: string): any => {
-  if (numericProperties.has(name)) {
-    const num = parseInt(value, 10);
-    return isNaN(num) ? value : num;
+const isOneOf =
+  (names: ReadonlyArray<string>) =>
+  (name: string): boolean =>
+    Arr.contains(names, name);
+
+const isNumericProperty = isOneOf(numericProperties);
+const isArrayProperty = isOneOf(arrayProperties);
+
+const fieldName = (name: string): string =>
+  Option.getOrElse(Record.get(propertyNameMap, name), () => name.toLowerCase());
+
+const propertyValue = (name: string, value: string): string | number => {
+  if (!isNumericProperty(name)) {
+    return value;
   }
-  return value;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? value : parsed;
 };
 
 /**
- * Parse properties into a record
- * Throws ParseError if any line is invalid
+ * Collect a component's property lines into fields: the last occurrence of a
+ * single-valued property wins; repeatable ones collect into arrays in order.
  */
-const parseProperties = (lines: string[]): Either.Either<Record<string, any>, ParseError> => {
-  const props: Record<string, any> = {};
-  const arrayProps = new Set(["ATTENDEE", "CATEGORIES", "RDATE", "EXDATE"]);
-
-  for (const line of lines) {
-    const result = parseContentLine(line);
-    
-    // Propagate parsing errors instead of silently dropping invalid lines
-    if (Either.isLeft(result)) {
-      return Either.left(result.left);
-    }
-
-    const { name, value } = result.right;
-    const fieldName = normalizePropertyName(name);
-    const parsedValue = parsePropertyValue(name, value);
-    
-    if (arrayProps.has(name)) {
-      if (!props[fieldName]) {
-        props[fieldName] = [];
-      }
-      props[fieldName].push(parsedValue);
-    } else {
-      props[fieldName] = parsedValue;
-    }
-  }
-
-  return Either.right(props);
+const collectProperties = (lines: ReadonlyArray<ContentLine>): Record<string, PropertyValue> => {
+  const [repeated, single] = Arr.partition(lines, (line) =>
+    isArrayProperty(line.name) ? Result.succeed(line) : Result.fail(line),
+  );
+  const singles = Record.fromEntries(
+    Arr.map(single, ({ name, value }) => [fieldName(name), propertyValue(name, value)] as const),
+  );
+  const groups = Arr.groupBy(repeated, ({ name }) => fieldName(name));
+  return {
+    ...singles,
+    ...Record.map(groups, (group) =>
+      Arr.map(group, ({ name, value }) => propertyValue(name, value)),
+    ),
+  };
 };
 
+const ofType =
+  (children: ReadonlyArray<ParsedComponent>) =>
+  (componentType: string): ReadonlyArray<RawComponent> =>
+    Arr.filterMap(children, (child) =>
+      child.componentType === componentType ? Result.succeed(child.component) : Result.failVoid,
+    );
+
+/** The sub-component fields a component type carries, when any are present. */
+const subComponentFields = (
+  componentType: string,
+  children: ReadonlyArray<ParsedComponent>,
+): Record<string, ReadonlyArray<RawComponent>> => {
+  const children_ = ofType(children);
+  const fields: ReadonlyArray<readonly [string, string]> =
+    componentType === "VEVENT" || componentType === "VTODO"
+      ? [["alarms", "VALARM"]]
+      : componentType === "VTIMEZONE"
+        ? [
+            ["standard", "STANDARD"],
+            ["daylight", "DAYLIGHT"],
+          ]
+        : [];
+  return Record.fromEntries(
+    Arr.filterMap(fields, ([field, type]) => {
+      const matching = children_(type);
+      return Arr.isReadonlyArrayNonEmpty(matching)
+        ? Result.succeed([field, matching] as const)
+        : Result.failVoid;
+    }),
+  );
+};
+
+/** The `Child` steps' components, in order. */
+const childrenOf = (steps: ReadonlyArray<Step>): ReadonlyArray<ParsedComponent> =>
+  Arr.filterMap(steps, (step) =>
+    Step.$is("Child")(step) ? Result.succeed(step.parsed) : Result.failVoid,
+  );
+
+/** The `Property` steps' lines, in order. */
+const propertiesOf = (steps: ReadonlyArray<Step>): ReadonlyArray<ContentLine> =>
+  Arr.filterMap(steps, (step) =>
+    Step.$is("Property")(step) ? Result.succeed(step.line) : Result.failVoid,
+  );
+
 /**
- * Parse a component block
+ * Parse the component whose `BEGIN:<componentType>` line is at `beginIndex`.
+ *
+ * Scans forward until the matching `END`. A nested `BEGIN` parses as a child;
+ * a child that fails (for instance because it is never closed) is skipped and
+ * its lines are scanned again as this component's own. A line without a `:`
+ * fails the component; reaching the end of the input fails it as unclosed.
  */
 const parseComponent = (
-  lines: string[],
-  startIndex: number
-): Either.Either<{ component: any; endIndex: number }, ParseError> => {
-  const beginLine = lines[startIndex];
-  if (!beginLine || beginLine.trim() === "") {
-    return Either.left(new ParseError(`Cannot parse component: empty or missing line at index ${startIndex}`));
-  }
-
-  const beginResult = parseContentLine(beginLine);
-  if (Either.isLeft(beginResult)) {
-    return Either.left(beginResult.left);
-  }
-
-  const { name: beginName, value: componentType } = beginResult.right;
-  if (beginName !== "BEGIN") {
-    return Either.left(new ParseError(`Expected BEGIN, got ${beginName}`));
-  }
-
-  const componentLines: string[] = [];
-  const subComponents: any[] = [];
-  let i = startIndex + 1;
-
-  while (i < lines.length) {
-    const line = lines[i];
-    if (!line) {
-      i++;
-      continue;
+  lines: ReadonlyArray<string>,
+  beginIndex: number,
+  componentType: string,
+): Result.Result<ParsedComponent, ParseError> => {
+  const stepAt = (index: number): readonly [ReadonlyArray<Step>, Option.Option<number>] => {
+    const line = lines[index];
+    if (line === undefined) {
+      return [
+        [
+          Step.Fail({
+            error: new ParseError({ message: `Component ${componentType} not closed` }),
+          }),
+        ],
+        Option.none(),
+      ];
     }
-
-    const lineResult = parseContentLine(line);
-    if (Either.isLeft(lineResult)) {
-      // Propagate parsing errors instead of silently skipping invalid lines
-      return Either.left(
-        new ParseError(
-          `Error parsing content line at index ${i}: ${lineResult.left.message}`
-        )
-      );
-    }
-
-    const { name, value } = lineResult.right;
-
-    if (name === "END" && value === componentType) {
-      // End of component
-      const propsResult = parseProperties(componentLines);
-      if (Either.isLeft(propsResult)) {
-        return Either.left(propsResult.left);
-      }
-      
-      const props = propsResult.right;
-      props.component = componentType;
-
-      // Add sub-components based on component type
-      if (componentType === "VEVENT" || componentType === "VTODO") {
-        const alarms = subComponents.filter((c) => c.component === "VALARM");
-        if (alarms.length > 0) {
-          props.alarms = alarms;
+    return Result.match(parseContentLine(line), {
+      onFailure: (error) => [
+        [
+          Step.Fail({
+            error: new ParseError({
+              message: `Error parsing content line at index ${index}: ${error.message}`,
+            }),
+          }),
+        ],
+        Option.none(),
+      ],
+      onSuccess: (content) => {
+        if (content.name === "END" && content.value === componentType) {
+          return [[Step.Close({ index })], Option.none()];
         }
-      } else if (componentType === "VTIMEZONE") {
-        // Handle STANDARD and DAYLIGHT sub-components
-        const standard = subComponents.filter((c) => c.component === "STANDARD");
-        const daylight = subComponents.filter((c) => c.component === "DAYLIGHT");
-        if (standard.length > 0) {
-          props.standard = standard;
+        if (content.name === "BEGIN") {
+          return Result.match(parseComponent(lines, index, content.value), {
+            onFailure: () => [[], Option.some(index + 1)],
+            onSuccess: (parsed) => [[Step.Child({ parsed })], Option.some(parsed.endIndex + 1)],
+          });
         }
-        if (daylight.length > 0) {
-          props.daylight = daylight;
-        }
-      }
+        return [[Step.Property({ line: content })], Option.some(index + 1)];
+      },
+    });
+  };
 
-      return Either.right({ component: props, endIndex: i });
-    } else if (name === "BEGIN") {
-      // Start of sub-component
-      const subResult = parseComponent(lines, i);
-      if (Either.isRight(subResult)) {
-        subComponents.push(subResult.right.component);
-        i = subResult.right.endIndex;
-      }
-    } else {
-      componentLines.push(line);
-    }
+  const steps = Arr.flatten(
+    Arr.unfold(Option.some(beginIndex + 1), (cursor) => Option.map(cursor, stepAt)),
+  );
 
-    i++;
+  return Step.$match(
+    Option.getOrElse(Arr.last(steps), () =>
+      Step.Fail({ error: new ParseError({ message: `Component ${componentType} not closed` }) }),
+    ),
+    {
+      Fail: ({ error }) => Result.fail(error),
+      Property: () =>
+        Result.fail(new ParseError({ message: `Component ${componentType} not closed` })),
+      Child: () =>
+        Result.fail(new ParseError({ message: `Component ${componentType} not closed` })),
+      Close: ({ index }) => {
+        const children = childrenOf(steps);
+        return Result.succeed({
+          component: {
+            ...collectProperties(propertiesOf(steps)),
+            component: componentType,
+            ...subComponentFields(componentType, children),
+          },
+          componentType,
+          children,
+          endIndex: index,
+        });
+      },
+    },
+  );
+};
+
+const isCalendarBegin = (line: string): boolean =>
+  Result.match(parseContentLine(line), {
+    onFailure: () => false,
+    onSuccess: ({ name, value }) => name === "BEGIN" && value === "VCALENDAR",
+  });
+
+/**
+ * Validate the parsed `VCALENDAR` and sort its children into the
+ * {@link Types.VCalendar} component lists.
+ */
+const toCalendar = ({ component: calendar, children }: ParsedComponent) => {
+  const version = calendar["version"];
+  const prodid = calendar["prodid"];
+  if (!version) {
+    return Result.fail(new ParseError({ message: "VERSION property is required" }));
   }
-
-  return Either.left(new ParseError(`Component ${componentType} not closed`));
+  if (version !== "2.0") {
+    return Result.fail(
+      new ParseError({ message: `VERSION must be "2.0", got "${String(version)}"` }),
+    );
+  }
+  if (!prodid || !Predicate.isString(prodid)) {
+    return Result.fail(new ParseError({ message: "PRODID property is required" }));
+  }
+  const of = ofType(children);
+  const properties = Record.filter(
+    {
+      calscale: calendar["calscale"],
+      method: calendar["method"],
+      name: calendar["name"],
+      description: calendar["description"],
+    },
+    Predicate.isNotUndefined,
+  );
+  const components = Record.filter(
+    {
+      timezones: of("VTIMEZONE"),
+      events: of("VEVENT"),
+      todos: of("VTODO"),
+      journals: of("VJOURNAL"),
+      freebusys: of("VFREEBUSY"),
+    },
+    Arr.isReadonlyArrayNonEmpty,
+  );
+  // SAFETY: the parser does not validate component contents; it keeps every
+  // property value verbatim (a CALSCALE other than GREGORIAN, an event without
+  // DTSTART) and sorts components by their `BEGIN` type, as it always has.
+  return Result.succeed({
+    component: "VCALENDAR",
+    prodid,
+    version,
+    ...properties,
+    ...components,
+  } as Types.VCalendar);
 };
 
 /**
- * Parse an iCalendar string into a VCalendar object
- * 
- * @param icalString - The iCalendar string to parse
- * @returns Effect that succeeds with VCalendar or fails with ParseError
+ * Parse an iCalendar string into a {@link Types.VCalendar}, synchronously.
+ *
+ * Text before the first `BEGIN:VCALENDAR` and after its `END:VCALENDAR` is
+ * ignored. Components of an unknown type parse but are not kept.
+ *
+ * @example
+ * ```ts
+ * import { parseResult } from "@thomasfosterau/effect-ical"
+ * import * as Result from "effect/Result"
+ *
+ * const result = parseResult("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//EN\r\nEND:VCALENDAR\r\n")
+ * if (Result.isSuccess(result)) {
+ *   console.log(result.success.prodid) // "-//Example//EN"
+ * }
+ * ```
+ *
+ * @category parsing
  */
-export const parse = (
-  icalString: string
-): Effect.Effect<Types.VCalendar, ParseError> => {
-  return Effect.gen(function* (_) {
-    const lines = unfoldLines(icalString);
-
-    // Find the main VCALENDAR component
-    let calendarStart = -1;
-    for (let i = 0; i < lines.length; i++) {
-      const result = parseContentLine(lines[i]!);
-      if (Either.isRight(result)) {
-        const { name, value } = result.right;
-        if (name === "BEGIN" && value === "VCALENDAR") {
-          calendarStart = i;
-          break;
-        }
-      }
-    }
-
-    if (calendarStart === -1) {
-      return yield* _(Effect.fail(new ParseError("No VCALENDAR component found")));
-    }
-
-    const result = parseComponent(lines, calendarStart);
-    if (Either.isLeft(result)) {
-      return yield* _(Effect.fail(result.left));
-    }
-
-    const calendar = result.right.component;
-
-    // Ensure required properties
-    if (!calendar.version) {
-      return yield* _(Effect.fail(new ParseError("VERSION property is required")));
-    }
-    if (calendar.version !== "2.0") {
-      return yield* _(Effect.fail(new ParseError(`VERSION must be "2.0", got "${calendar.version}"`)));
-    }
-    if (!calendar.prodid) {
-      return yield* _(Effect.fail(new ParseError("PRODID property is required")));
-    }
-
-    // Organize components
-    const components: {
-      events: Types.VEvent[];
-      todos: Types.VTodo[];
-      journals: Types.VJournal[];
-      freebusys: Types.VFreeBusy[];
-      timezones: Types.VTimezone[];
-    } = {
-      events: [],
-      todos: [],
-      journals: [],
-      freebusys: [],
-      timezones: [],
-    };
-
-    // Parse all components within VCALENDAR
-    let i = calendarStart + 1;
-    while (i < lines.length) {
-      const line = lines[i];
-      if (!line) {
-        i++;
-        continue;
-      }
-
-      const lineResult = parseContentLine(line);
-      if (Either.isRight(lineResult)) {
-        const { name, value } = lineResult.right;
-
-        if (name === "BEGIN") {
-          const compResult = parseComponent(lines, i);
-          if (Either.isRight(compResult)) {
-            const comp = compResult.right.component;
-            switch (comp.component) {
-              case "VEVENT":
-                components.events.push(comp);
-                break;
-              case "VTODO":
-                components.todos.push(comp);
-                break;
-              case "VJOURNAL":
-                components.journals.push(comp);
-                break;
-              case "VFREEBUSY":
-                components.freebusys.push(comp);
-                break;
-              case "VTIMEZONE":
-                components.timezones.push(comp);
-                break;
-            }
-            i = compResult.right.endIndex;
-          }
-        } else if (name === "END" && value === "VCALENDAR") {
-          break;
-        }
-      }
-
-      i++;
-    }
-
-    const vcalendar: Types.VCalendar = {
-      component: "VCALENDAR",
-      prodid: calendar.prodid,
-      version: calendar.version,
-      calscale: calendar.calscale,
-      method: calendar.method,
-      name: calendar.name,
-      description: calendar.description,
-      timezones: components.timezones.length > 0 ? components.timezones : undefined,
-      events: components.events.length > 0 ? components.events : undefined,
-      todos: components.todos.length > 0 ? components.todos : undefined,
-      journals: components.journals.length > 0 ? components.journals : undefined,
-      freebusys: components.freebusys.length > 0 ? components.freebusys : undefined,
-    };
-
-    return vcalendar;
+export const parseResult = (icalString: string): Result.Result<Types.VCalendar, ParseError> => {
+  const lines = unfoldLines(icalString);
+  return Option.match(Arr.findFirstIndex(lines, isCalendarBegin), {
+    onNone: () => Result.fail(new ParseError({ message: "No VCALENDAR component found" })),
+    onSome: (start) => Result.flatMap(parseComponent(lines, start, "VCALENDAR"), toCalendar),
   });
 };
 
 /**
- * Parse an iCalendar string and return Either
+ * Parse an iCalendar string into a {@link Types.VCalendar}, failing with a
+ * {@link ParseError}. The parse runs when the Effect runs.
+ *
+ * @example
+ * ```ts
+ * import { parse } from "@thomasfosterau/effect-ical"
+ * import * as Effect from "effect/Effect"
+ *
+ * const program = parse("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//EN\r\nEND:VCALENDAR\r\n")
+ * const calendar = await Effect.runPromise(program)
+ * ```
+ *
+ * @category parsing
  */
-export const parseEither = (
-  icalString: string
-): Either.Either<Types.VCalendar, ParseError> => {
-  return Effect.runSync(Effect.either(parse(icalString)));
-};
+export const parse = (icalString: string): Effect.Effect<Types.VCalendar, ParseError> =>
+  Effect.suspend(() => Effect.fromResult(parseResult(icalString)));

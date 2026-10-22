@@ -140,3 +140,21 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Vite files
+vite.config.ts.timestamp-*
+.vite/
+
+# Claude Code: per-user state stays local; `.claude/settings.json` and
+# `.claude/hooks/` are tracked (the SessionStart hook provisions agent sessions).
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+
+# Vite+: the generated git-hook runner (`vp config`); the editable hook
+# itself (`.vite-hooks/pre-commit`) is committed.
+.vite-hooks/_/
+
+# fallow's local cache and SARIF output.
+.fallow
+fallow.sarif

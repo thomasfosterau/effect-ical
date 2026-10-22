@@ -1,0 +1,77 @@
+name: Release
+
+# Changesets release for @thomasfosterau/effect-ical: opens the version PR
+# (`chore: version packages`) and, once the owner merges it, publishes with
+# npm trusted publishing (OIDC). The flow, the provenance posture and the
+# owner's one-time setup are in PUBLISHING.md. The default branch is `trunk`,
+# not `main`. Copied from the effect-web library's release workflow.
+#
+# The job runs in the protected `release` environment, so required reviewers
+# added to it gate every publish.
+
+on:
+  push:
+    branches: [trunk]
+  workflow_dispatch:
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+# No permissions by default; the release job opts into exactly what it needs.
+permissions: {}
+
+jobs:
+  release:
+    # Never run on forks (they have neither the environment nor the trusted
+    # publisher binding, so a fork cannot publish on the owner's behalf).
+    if: github.repository == 'thomasfosterau/effect-ical'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write # push the version branch and tags
+      pull-requests: write # open/update the version PR
+      id-token: write # mint the OIDC token npm exchanges for publish creds
+    env:
+      # pnpm 11 defaults `verify-deps-before-run` to `install`: before any
+      # `pnpm run` it compares node_modules with the manifests and, if a
+      # manifest looks newer than the last install, re-installs WITH lifecycle
+      # scripts, undoing the `--ignore-scripts` below inside a job that holds
+      # `id-token: write`. It triggers whenever a manifest's mtime moves after
+      # the install step, e.g. when the Changesets action resets
+      # `changeset-release/trunk`. pnpm 11 reads only the `pnpm_config_*`
+      # spelling.
+      pnpm_config_verify_deps_before_run: "false"
+    steps:
+      # The Changesets action pushes the version branch, so it needs the
+      # checkout's git credentials (the ephemeral, job-scoped GITHUB_TOKEN).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # pnpm before Node so setup-node's `cache: pnpm` can resolve the store
+      # path. The pnpm version comes from `packageManager` in package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: latest
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      # --ignore-scripts stops a compromised dependency from running install
+      # scripts in the privileged publish job. It also skips this repo's own
+      # `prepare` (`vp config`'s git hooks and the `effect-tsgo` patch), which
+      # neither `vp pack`, `changeset version` nor `vp fmt` needs.
+      #
+      # No check or test step: CI (ci.yml) runs every gate on each PR into
+      # `trunk` and on each push to `trunk`, so this job runs only what
+      # publishing needs. `changeset:publish` builds (`vp run build`) before
+      # publishing, so a build break still stops the publish.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      # `changeset publish` runs `pnpm publish`; pnpm 11 publishes natively
+      # and performs the trusted-publishing (OIDC) exchange itself, so the job
+      # installs no npm CLI of its own and holds no NPM_TOKEN.
+      - name: Create Release PR or publish
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          version-script: pnpm run changeset:version
+          publish-script: pnpm run changeset:publish
+          commit-message: "chore: version packages"
+          pr-title: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
