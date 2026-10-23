@@ -11,6 +11,9 @@
  * @module
  */
 
+import * as Compiler from "@thomasfosterau/effect-parse/Compiler";
+import * as Parser from "@thomasfosterau/effect-parse/Parser";
+import * as Token from "@thomasfosterau/effect-parse/Token";
 import * as Arr from "effect/Array";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -27,14 +30,27 @@ import type * as Types from "./types.js";
  * calendar, an unclosed calendar, a line without a `:`, or a missing or wrong
  * `VERSION` / `PRODID`). `message` says which.
  *
+ * When the failure belongs to one content line, `line` and `column` (both
+ * 1-based) locate where that line starts in the input: the line without a
+ * `:`, or the `BEGIN` line of a component that is never closed. Lines are
+ * counted at each `\n`, as the parser splits them.
+ *
  * @category errors
  */
 export class ParseError extends Schema.TaggedError<ParseError, { readonly brand: unique symbol }>()(
   "ParseError",
   {
     message: Schema.String,
+    line: Schema.optional(Schema.Int),
+    column: Schema.optional(Schema.Int),
   },
 ) {}
+
+/** A 1-based line and column in the input. */
+interface Position {
+  readonly line: number;
+  readonly column: number;
+}
 
 /** One content line: `NAME[;PARAM=VALUE]*:VALUE`, with the name upper-cased. */
 interface ContentLine {
@@ -66,26 +82,77 @@ type Step = Data.TaggedEnum<{
 
 const Step = Data.taggedEnum<Step>();
 
-const isContinuation = (line: string): boolean => line.startsWith(" ") || line.startsWith("\t");
+/** One unfolded content line and the offset where it starts in the input. */
+interface Line {
+  readonly text: string;
+  readonly offset: number;
+}
+
+/** A line ending: `CRLF` or a bare `LF` (a lone `CR` is line content). */
+const eol = /*#__PURE__*/ Parser.alt(Token.literal("\r\n"), Token.literal("\n"));
+
+/** One or more line endings: empty lines are dropped. */
+const eols = /*#__PURE__*/ Parser.repeat(eol, { min: 1 });
+
+/**
+ * A fold (RFC 5545 §3.1): line endings followed by a space or tab, removed
+ * from the value. The empty lines it skips are dropped, so a continuation
+ * joins the previous non-empty line.
+ */
+const fold = /*#__PURE__*/ Parser.as(
+  /*#__PURE__*/ Parser.preceded(eols, /*#__PURE__*/ Token.oneOf(" \t")),
+  "",
+);
+
+/** A `CR` that does not start a `CRLF`: kept as content, as `\r?\n` splitting keeps it. */
+const loneCr = /*#__PURE__*/ Parser.terminated(
+  /*#__PURE__*/ Token.literal("\r"),
+  /*#__PURE__*/ Parser.not(/*#__PURE__*/ Token.literal("\n")),
+);
+
+/**
+ * One unfolded content line. It starts at any character that is not a line
+ * ending, a space or tab included: a continuation with nothing before it
+ * stays a line of its own, whole.
+ */
+const line = /*#__PURE__*/ Parser.struct({
+  offset: Parser.location,
+  text: /*#__PURE__*/ Parser.fold(
+    /*#__PURE__*/ Parser.alt(/*#__PURE__*/ Token.takeTill("\r\n", { min: 1 }), loneCr, fold),
+    { init: () => "", f: (text: string, chunk: string) => text + chunk, range: { min: 1 } },
+  ),
+});
+
+/**
+ * The content-line scanner, compiled: every unfolded line of an input, in
+ * order, with its offset. It accepts any string (every character is a line
+ * ending or line content), so it never fails.
+ */
+const lines = /*#__PURE__*/ Compiler.jit(
+  /*#__PURE__*/ Parser.delimited(
+    /*#__PURE__*/ Parser.repeat(eol),
+    /*#__PURE__*/ Parser.separated(line, eols),
+    /*#__PURE__*/ Parser.repeat(eol),
+  ),
+);
 
 /**
  * Unfold lines according to RFC 5545 §3.1: a line that starts with a space or
  * tab continues the previous non-empty line (minus that one whitespace
  * character). Empty lines are dropped; a continuation with nothing before it
- * stays a line of its own.
+ * stays a line of its own. Lines are split at `\r\n` or `\n`.
  */
-const unfoldLines = (text: string): ReadonlyArray<string> => {
-  const lines = Arr.filter(text.split(/\r?\n/), Str.isNonEmpty);
-  const starts = Arr.filterMap(lines, (line, index) =>
-    index === 0 || !isContinuation(line) ? Result.succeed(index) : Result.failVoid,
-  );
-  const ends = Arr.append(Arr.drop(starts, 1), lines.length);
-  return Arr.map(Arr.zip(starts, ends), ([start, end]) =>
-    Arr.join(
-      Arr.map(lines.slice(start, end), (line, offset) => (offset === 0 ? line : line.slice(1))),
-      "",
-    ),
-  );
+const unfoldLines = (text: string): ReadonlyArray<Line> =>
+  Result.getOrElse(Parser.parse(lines, text), () => []);
+
+/** The 1-based line and column of an offset, counting lines at each `\n`. */
+const positionOf = (text: string, offset: number): Position => {
+  const before = text.slice(0, offset);
+  const lineStart = before.lastIndexOf("\n") + 1;
+  return {
+    line: before.split("\n").length,
+    column: offset - lineStart + 1,
+  };
 };
 
 /** Parse a content line into its upper-cased name and its value. */
@@ -207,30 +274,34 @@ const propertiesOf = (steps: ReadonlyArray<Step>): ReadonlyArray<ContentLine> =>
  * a child that fails (for instance because it is never closed) is skipped and
  * its lines are scanned again as this component's own. A line without a `:`
  * fails the component; reaching the end of the input fails it as unclosed.
+ * `positionAt` locates a line's offset for the error.
  */
 const parseComponent = (
-  lines: ReadonlyArray<string>,
+  lines: ReadonlyArray<Line>,
   beginIndex: number,
   componentType: string,
+  positionAt: (offset: number) => Position,
 ): Result.Result<ParsedComponent, ParseError> => {
+  const notClosed = (): ParseError =>
+    new ParseError({
+      message: `Component ${componentType} not closed`,
+      ...Option.match(Option.fromUndefinedOr(lines[beginIndex]), {
+        onNone: () => ({}),
+        onSome: ({ offset }) => positionAt(offset),
+      }),
+    });
   const stepAt = (index: number): readonly [ReadonlyArray<Step>, Option.Option<number>] => {
     const line = lines[index];
     if (line === undefined) {
-      return [
-        [
-          Step.Fail({
-            error: new ParseError({ message: `Component ${componentType} not closed` }),
-          }),
-        ],
-        Option.none(),
-      ];
+      return [[Step.Fail({ error: notClosed() })], Option.none()];
     }
-    return Result.match(parseContentLine(line), {
+    return Result.match(parseContentLine(line.text), {
       onFailure: (error) => [
         [
           Step.Fail({
             error: new ParseError({
               message: `Error parsing content line at index ${index}: ${error.message}`,
+              ...positionAt(line.offset),
             }),
           }),
         ],
@@ -241,7 +312,7 @@ const parseComponent = (
           return [[Step.Close({ index })], Option.none()];
         }
         if (content.name === "BEGIN") {
-          return Result.match(parseComponent(lines, index, content.value), {
+          return Result.match(parseComponent(lines, index, content.value, positionAt), {
             onFailure: () => [[], Option.some(index + 1)],
             onSuccess: (parsed) => [[Step.Child({ parsed })], Option.some(parsed.endIndex + 1)],
           });
@@ -256,15 +327,11 @@ const parseComponent = (
   );
 
   return Step.$match(
-    Option.getOrElse(Arr.last(steps), () =>
-      Step.Fail({ error: new ParseError({ message: `Component ${componentType} not closed` }) }),
-    ),
+    Option.getOrElse(Arr.last(steps), () => Step.Fail({ error: notClosed() })),
     {
       Fail: ({ error }) => Result.fail(error),
-      Property: () =>
-        Result.fail(new ParseError({ message: `Component ${componentType} not closed` })),
-      Child: () =>
-        Result.fail(new ParseError({ message: `Component ${componentType} not closed` })),
+      Property: () => Result.fail(notClosed()),
+      Child: () => Result.fail(notClosed()),
       Close: ({ index }) => {
         const children = childrenOf(steps);
         return Result.succeed({
@@ -282,8 +349,8 @@ const parseComponent = (
   );
 };
 
-const isCalendarBegin = (line: string): boolean =>
-  Result.match(parseContentLine(line), {
+const isCalendarBegin = (line: Line): boolean =>
+  Result.match(parseContentLine(line.text), {
     onFailure: () => false,
     onSuccess: ({ name, value }) => name === "BEGIN" && value === "VCALENDAR",
   });
@@ -361,7 +428,11 @@ export const parseResult = (icalString: string): Result.Result<Types.VCalendar, 
   const lines = unfoldLines(icalString);
   return Option.match(Arr.findFirstIndex(lines, isCalendarBegin), {
     onNone: () => Result.fail(new ParseError({ message: "No VCALENDAR component found" })),
-    onSome: (start) => Result.flatMap(parseComponent(lines, start, "VCALENDAR"), toCalendar),
+    onSome: (start) =>
+      Result.flatMap(
+        parseComponent(lines, start, "VCALENDAR", (offset) => positionOf(icalString, offset)),
+        toCalendar,
+      ),
   });
 };
 

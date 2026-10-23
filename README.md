@@ -9,15 +9,15 @@ iCalendar ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)) encoding a
 
 | Package | Purpose | Peers |
 | --- | --- | --- |
-| [`@thomasfosterau/effect-ical`](https://www.npmjs.com/package/@thomasfosterau/effect-ical) | iCalendar parse, encode and build | `effect` `>=4.0.0-rc.118` |
+| [`@thomasfosterau/effect-ical`](https://www.npmjs.com/package/@thomasfosterau/effect-ical) | iCalendar parse, encode and build | `effect` `>=4.0.0`, `@thomasfosterau/effect-parse` `^0.2.0` |
 
 ## Install
 
 ```sh
-pnpm add @thomasfosterau/effect-ical effect
+pnpm add @thomasfosterau/effect-ical @thomasfosterau/effect-parse effect
 ```
 
-The package is ESM only and has no runtime dependencies besides its `effect` peer.
+The package is ESM only and has no runtime dependencies besides its peers: `effect`, and `@thomasfosterau/effect-parse`, whose compiled grammar scans the content lines.
 
 ## Quick start
 
@@ -60,7 +60,7 @@ Everything is exported from the package root.
 | --- | --- | --- |
 | `parse` | `(text: string) => Effect<VCalendar, ParseError>` | Runs when the Effect runs. |
 | `parseResult` | `(text: string) => Result<VCalendar, ParseError>` | The same parse, synchronously. |
-| `ParseError` | tagged error, `_tag: "ParseError"`, `message` | No `VCALENDAR`, an unclosed calendar, a line without `:`, a missing or non-`2.0` `VERSION`, or a missing `PRODID`. |
+| `ParseError` | tagged error, `_tag: "ParseError"`, `message`, optional `line` / `column` | No `VCALENDAR`, an unclosed calendar, a line without `:`, a missing or non-`2.0` `VERSION`, or a missing `PRODID`. For a line without `:` or an unclosed component, `line` and `column` (1-based) locate the offending line or the component's `BEGIN` line. |
 
 Text before the first `BEGIN:VCALENDAR` and after its `END:VCALENDAR` is ignored, and so are components of an unknown type. Property names become lower-cased fields (`PERCENT-COMPLETE` → `percent`, `LAST-MODIFIED` → `lastmod`, `X-WR-CALNAME` → `"x-wr-calname"`); `PRIORITY`, `PERCENT-COMPLETE`, `REPEAT` and `SEQUENCE` become numbers when they are integers. Property parameters (`;TZID=…`) are dropped.
 
