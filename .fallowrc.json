@@ -1,6 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-  "entry": ["src/index.ts", "tests/**/*.test.ts", "examples/*.ts", "vite.config.ts"],
+  "entry": [
+    "src/index.ts",
+    "tests/**/*.test.ts",
+    "tests/**/*.types.ts",
+    "examples/*.ts",
+    "vite.config.ts"
+  ],
   "ignorePatterns": ["**/dist/**", "**/coverage/**"],
   "ignoreDependencies": [
     "@types/node",

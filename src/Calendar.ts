@@ -32,20 +32,22 @@ import { Todo } from "./Todo.js";
  *
  * @category models
  */
-export class Calendar extends Schema.Class<Calendar>("Calendar")({
-  component: Schema.Literal("VCALENDAR"),
-  version: Schema.Literal("2.0"),
-  prodid: Schema.String,
-  calscale: Schema.optional(Schema.Literal("GREGORIAN")),
-  method: Schema.optional(Schema.String),
-  name: Schema.optional(Schema.String),
-  description: Schema.optional(Schema.String),
-  events: Schema.optional(Schema.Array(Event)),
-  todos: Schema.optional(Schema.Array(Todo)),
-  journals: Schema.optional(Schema.Array(Schema.Any)),
-  freebusys: Schema.optional(Schema.Array(Schema.Any)),
-  timezones: Schema.optional(Schema.Array(Schema.Any)),
-}) {}
+export class Calendar extends Schema.Class<Calendar, { readonly brand: unique symbol }>("Calendar")(
+  {
+    component: Schema.Literal("VCALENDAR"),
+    version: Schema.Literal("2.0"),
+    prodid: Schema.String,
+    calscale: Schema.optional(Schema.Literal("GREGORIAN")),
+    method: Schema.optional(Schema.String),
+    name: Schema.optional(Schema.String),
+    description: Schema.optional(Schema.String),
+    events: Schema.optional(Schema.Array(Event)),
+    todos: Schema.optional(Schema.Array(Todo)),
+    journals: Schema.optional(Schema.Array(Schema.Any)),
+    freebusys: Schema.optional(Schema.Array(Schema.Any)),
+    timezones: Schema.optional(Schema.Array(Schema.Any)),
+  },
+) {}
 
 /**
  * Create a calendar with `version` 2.0 and the given product identifier (`PRODID`).

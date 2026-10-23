@@ -19,7 +19,7 @@ import * as Schema from "effect/Schema";
 /**
  * A `VTODO` component: an action item, as an Effect Schema class.
  */
-export class Todo extends Schema.Class<Todo>("Todo")({
+export class Todo extends Schema.Class<Todo, { readonly brand: unique symbol }>("Todo")({
   component: Schema.Literal("VTODO"),
   uid: Schema.optional(Schema.String),
   dtstamp: Schema.optional(Schema.String),

@@ -29,9 +29,12 @@ import type * as Types from "./types.js";
  *
  * @category errors
  */
-export class ParseError extends Schema.TaggedError<ParseError>()("ParseError", {
-  message: Schema.String,
-}) {}
+export class ParseError extends Schema.TaggedError<ParseError, { readonly brand: unique symbol }>()(
+  "ParseError",
+  {
+    message: Schema.String,
+  },
+) {}
 
 /** One content line: `NAME[;PARAM=VALUE]*:VALUE`, with the name upper-cased. */
 interface ContentLine {
