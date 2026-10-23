@@ -79,7 +79,7 @@ export const withProdid =
   (prodid: string) =>
   (builder: Builder): Builder => ({
     ...builder,
-    calendar: { ...builder.calendar, prodid },
+    calendar: new Calendar({ ...builder.calendar, prodid }),
   });
 
 /**
@@ -89,7 +89,7 @@ export const withName =
   (name: string) =>
   (builder: Builder): Builder => ({
     ...builder,
-    calendar: { ...builder.calendar, name },
+    calendar: new Calendar({ ...builder.calendar, name }),
   });
 
 /**
@@ -99,7 +99,7 @@ export const withDescription =
   (description: string) =>
   (builder: Builder): Builder => ({
     ...builder,
-    calendar: { ...builder.calendar, description },
+    calendar: new Calendar({ ...builder.calendar, description }),
   });
 
 /**
@@ -109,7 +109,7 @@ export const withCalscale =
   (calscale: "GREGORIAN") =>
   (builder: Builder): Builder => ({
     ...builder,
-    calendar: { ...builder.calendar, calscale },
+    calendar: new Calendar({ ...builder.calendar, calscale }),
   });
 
 /**
@@ -119,7 +119,7 @@ export const withMethod =
   (method: string) =>
   (builder: Builder): Builder => ({
     ...builder,
-    calendar: { ...builder.calendar, method },
+    calendar: new Calendar({ ...builder.calendar, method }),
   });
 
 /**
@@ -129,10 +129,10 @@ export const withEvent =
   (event: Event) =>
   (builder: Builder): Builder => ({
     ...builder,
-    calendar: {
+    calendar: new Calendar({
       ...builder.calendar,
       events: [...(builder.calendar.events || []), event],
-    },
+    }),
   });
 
 /**
@@ -142,10 +142,10 @@ export const withTodo =
   (todo: Todo) =>
   (builder: Builder): Builder => ({
     ...builder,
-    calendar: {
+    calendar: new Calendar({
       ...builder.calendar,
       todos: [...(builder.calendar.todos || []), todo],
-    },
+    }),
   });
 
 /**
