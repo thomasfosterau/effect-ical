@@ -23,7 +23,10 @@ import type * as Types from "./types.js";
  *
  * @category errors
  */
-export class EncodeError extends Schema.TaggedError<EncodeError>()("EncodeError", {
+export class EncodeError extends Schema.TaggedError<
+  EncodeError,
+  { readonly brand: unique symbol }
+>()("EncodeError", {
   message: Schema.String,
 }) {}
 

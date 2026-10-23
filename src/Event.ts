@@ -20,7 +20,7 @@ import * as Schema from "effect/Schema";
 /**
  * A `VEVENT` component: a scheduled event, as an Effect Schema class.
  */
-export class Event extends Schema.Class<Event>("Event")({
+export class Event extends Schema.Class<Event, { readonly brand: unique symbol }>("Event")({
   component: Schema.Literal("VEVENT"),
   uid: Schema.optional(Schema.String),
   dtstamp: Schema.optional(Schema.String),

@@ -19,9 +19,12 @@ import { encode, encodeSync, type EncodeError } from "./encoder.js";
  *
  * @category errors
  */
-export class BuildError extends Schema.TaggedError<BuildError>()("BuildError", {
-  message: Schema.String,
-}) {}
+export class BuildError extends Schema.TaggedError<BuildError, { readonly brand: unique symbol }>()(
+  "BuildError",
+  {
+    message: Schema.String,
+  },
+) {}
 
 /** An event under construction is complete once it has a non-empty `dtstart`. */
 const isCompleteEvent = (event: Partial<Types.VEvent>): event is Types.VEvent =>
