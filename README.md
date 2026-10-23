@@ -151,7 +151,7 @@ Event setters: `uid`, `dtstart`, `dtend`, `duration`, `summary`, `description`, 
 
 ### Pipeable modules: `Calendar`, `Event`, `Todo`
 
-Each module defines an Effect Schema class of the same name plus a `make` constructor and pipeable `with*` setters that return a new value.
+Each module defines an Effect Schema class of the same name plus a `make` constructor and pipeable `with*` setters that return a new instance of the class (built with its constructor, so `instanceof` holds and Schema encoding works; properties the class does not declare are not carried over).
 
 ```ts
 import { Calendar, Event, Todo } from "@thomasfosterau/effect-ical";

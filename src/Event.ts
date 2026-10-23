@@ -3,8 +3,9 @@
  * Effect Schema class.
  *
  * Start from `Event.make(dtstart)` and pipe setters (`Event.withSummary`,
- * `Event.withLocation`, …); each returns a new event and leaves its input
- * untouched. `Event.encode` renders the event's content lines.
+ * `Event.withLocation`, …); each returns a new event (an instance of the class,
+ * so properties it does not declare are not carried over) and leaves its
+ * input untouched. `Event.encode` renders the event's content lines.
  *
  * @module
  */
@@ -56,140 +57,154 @@ export const make = (dtstart: string): Event => {
  */
 export const withUid =
   (uid: string) =>
-  (event: Event): Event => ({
-    ...event,
-    uid,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      uid,
+    });
 
 /**
  * Return a copy of the event with its end (`DTEND`) set.
  */
 export const withDtend =
   (dtend: string) =>
-  (event: Event): Event => ({
-    ...event,
-    dtend,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      dtend,
+    });
 
 /**
  * Return a copy of the event with its duration (`DURATION`, e.g. `PT1H`) set.
  */
 export const withDuration =
   (duration: string) =>
-  (event: Event): Event => ({
-    ...event,
-    duration,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      duration,
+    });
 
 /**
  * Return a copy of the event with its summary (`SUMMARY`) set.
  */
 export const withSummary =
   (summary: string) =>
-  (event: Event): Event => ({
-    ...event,
-    summary,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      summary,
+    });
 
 /**
  * Return a copy of the event with its description (`DESCRIPTION`) set.
  */
 export const withDescription =
   (description: string) =>
-  (event: Event): Event => ({
-    ...event,
-    description,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      description,
+    });
 
 /**
  * Return a copy of the event with its location (`LOCATION`) set.
  */
 export const withLocation =
   (location: string) =>
-  (event: Event): Event => ({
-    ...event,
-    location,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      location,
+    });
 
 /**
  * Return a copy of the event with its organizer (`ORGANIZER`, e.g. a `mailto:` URI) set.
  */
 export const withOrganizer =
   (organizer: string) =>
-  (event: Event): Event => ({
-    ...event,
-    organizer,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      organizer,
+    });
 
 /**
  * Return a copy of the event with one more attendee (`ATTENDEE`) appended.
  */
 export const withAttendee =
   (attendee: string) =>
-  (event: Event): Event => ({
-    ...event,
-    attendee: [...(event.attendee || []), attendee],
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      attendee: [...(event.attendee || []), attendee],
+    });
 
 /**
  * Return a copy of the event with its categories (`CATEGORIES`) replaced.
  */
 export const withCategories =
   (categories: string[]) =>
-  (event: Event): Event => ({
-    ...event,
-    categories,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      categories,
+    });
 
 /**
  * Return a copy of the event with its status (`STATUS`) set.
  */
 export const withStatus =
   (status: "TENTATIVE" | "CONFIRMED" | "CANCELLED") =>
-  (event: Event): Event => ({
-    ...event,
-    status,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      status,
+    });
 
 /**
  * Return a copy of the event with its recurrence rule (`RRULE`, e.g. `FREQ=WEEKLY`) set.
  */
 export const withRrule =
   (rrule: string) =>
-  (event: Event): Event => ({
-    ...event,
-    rrule,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      rrule,
+    });
 
 /**
  * Return a copy of the event with its URL (`URL`) set.
  */
 export const withUrl =
   (url: string) =>
-  (event: Event): Event => ({
-    ...event,
-    url,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      url,
+    });
 
 /**
  * Return a copy of the event with its priority (`PRIORITY`: 0 undefined, 1 highest, 9 lowest) set.
  */
 export const withPriority =
   (priority: number) =>
-  (event: Event): Event => ({
-    ...event,
-    priority,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      priority,
+    });
 
 /**
  * Return a copy of the event with its access classification (`CLASS`) set.
  */
 export const withClassification =
   (classification: "PUBLIC" | "PRIVATE" | "CONFIDENTIAL") =>
-  (event: Event): Event => ({
-    ...event,
-    class: classification,
-  });
+  (event: Event): Event =>
+    new Event({
+      ...event,
+      class: classification,
+    });
 
 /**
  * Render an event as its iCalendar content lines, from `BEGIN:VEVENT` to

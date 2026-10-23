@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from "vite-plus/test";
 import { pipe } from "effect/Function";
+import * as Schema from "effect/Schema";
 import { runTest } from "./helpers/effect.ts";
 import * as Calendar from "../src/Calendar";
 import * as Event from "../src/Event";
@@ -219,7 +220,9 @@ describe("Event.encode and Todo.encode", () => {
       Event.withPriority(0),
       Event.withClassification("PUBLIC"),
     );
-    const lines = await runTest(Event.encode({ ...event, dtstamp: "20240101T000000Z" }));
+    const lines = await runTest(
+      Event.encode(new Event.Event({ ...event, dtstamp: "20240101T000000Z" })),
+    );
     expect(lines).toEqual([
       "BEGIN:VEVENT",
       "DTSTART:20240101T120000Z",
@@ -266,7 +269,7 @@ describe("Event.encode and Todo.encode", () => {
       Todo.withRrule("FREQ=WEEKLY"),
     );
     const lines = await runTest(
-      Todo.encode({ ...todo, dtstamp: "20240101T000000Z", duration: "P1D" }),
+      Todo.encode(new Todo.Todo({ ...todo, dtstamp: "20240101T000000Z", duration: "P1D" })),
     );
     expect(lines).toEqual([
       "BEGIN:VTODO",
@@ -289,5 +292,73 @@ describe("Event.encode and Todo.encode", () => {
 
   it("writes nothing but the delimiters for a bare to-do", async () => {
     expect(await runTest(Todo.encode(Todo.make()))).toEqual(["BEGIN:VTODO", "END:VTODO"]);
+  });
+});
+
+describe("setters return Schema class instances (#5)", () => {
+  it("keeps every Event setter's result an Event", () => {
+    const original = Event.make("20240101T120000Z");
+    const event = pipe(
+      original,
+      Event.withUid("e1"),
+      Event.withDtend("20240101T130000Z"),
+      Event.withDuration("PT1H"),
+      Event.withSummary("Summary"),
+      Event.withDescription("Description"),
+      Event.withLocation("Room"),
+      Event.withOrganizer("mailto:org@example.com"),
+      Event.withAttendee("mailto:a@example.com"),
+      Event.withCategories(["A", "B"]),
+      Event.withStatus("CONFIRMED"),
+      Event.withRrule("FREQ=DAILY"),
+      Event.withUrl("https://example.com"),
+      Event.withPriority(0),
+      Event.withClassification("PUBLIC"),
+    );
+    expect(event).toBeInstanceOf(Event.Event);
+    expect(original).toEqual(Event.make("20240101T120000Z"));
+    expect(Schema.encodeSync(Event.Event)(event)).toMatchObject({ uid: "e1", priority: 0 });
+  });
+
+  it("keeps every Todo setter's result a Todo", () => {
+    const original = Todo.make();
+    const todo = pipe(
+      original,
+      Todo.withUid("t1"),
+      Todo.withDtstart("20240101"),
+      Todo.withDue("20240102"),
+      Todo.withSummary("Todo"),
+      Todo.withDescription("Description"),
+      Todo.withLocation("Desk"),
+      Todo.withStatus("COMPLETED"),
+      Todo.withPercent(100),
+      Todo.withCompleted("20240102"),
+      Todo.withPriority(1),
+      Todo.withRrule("FREQ=WEEKLY"),
+    );
+    expect(todo).toBeInstanceOf(Todo.Todo);
+    expect(original).toEqual(Todo.make());
+    expect(Schema.encodeSync(Todo.Todo)(todo)).toMatchObject({ uid: "t1", percent: 100 });
+  });
+
+  it("keeps the calendar a Calendar through every builder setter", () => {
+    const calendar = pipe(
+      Calendar.builder(),
+      Calendar.withProdid("-//Piped//EN"),
+      Calendar.withName("Name"),
+      Calendar.withDescription("Description"),
+      Calendar.withCalscale("GREGORIAN"),
+      Calendar.withMethod("REQUEST"),
+      Calendar.withEvent(Event.make("20240101")),
+      Calendar.withTodo(Todo.make()),
+      Calendar.build,
+    );
+    expect(calendar).toBeInstanceOf(Calendar.Calendar);
+    expect(calendar.events?.[0]).toBeInstanceOf(Event.Event);
+    expect(calendar.todos?.[0]).toBeInstanceOf(Todo.Todo);
+    expect(Schema.encodeSync(Calendar.Calendar)(calendar)).toMatchObject({
+      prodid: "-//Piped//EN",
+      events: [{ component: "VEVENT", dtstart: "20240101" }],
+    });
   });
 });
