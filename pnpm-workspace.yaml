@@ -35,6 +35,9 @@ catalog:
   # the singleton override below resolves it onto the catalog `effect` (the
   # 0.5.0-era scoped `beta.100` override effect-web carries is not needed).
   "@mpsuesser/oxlint-plugin-effect": ^0.6.0
+  # Peer: the content-line scanner (`src/parser.ts`) is an effect-parse
+  # grammar compiled with `Compiler.jit`, which 0.2.0 introduced (#7).
+  "@thomasfosterau/effect-parse": ^0.2.0
   "@types/node": ^26.6.5
   # Must equal the vitest that vite-plus bundles (see `vitest` below);
   # vite-plus refuses to run coverage on a mismatch.
@@ -72,11 +75,16 @@ catalog:
 # `4.0.5` peer would reject a consumer on another 4.x release). The floor is
 # rc.118, the first release after the `effect/unstable/*` -> `effect/*` path
 # move, per the shared Effect-floor policy the sibling libraries follow
-# (effect-web#31). `pnpm publish` (which `changeset publish` runs) replaces
-# `catalog:peers` with these ranges in the published manifest.
+# (effect-web#31), raised to 4.0.0 with the effect-parse peer (#7): effect-parse
+# peers on `effect ^4.0.0`, so no consumer on an rc can satisfy both.
+# `pnpm publish` (which `changeset publish` runs) replaces `catalog:peers` with
+# these ranges in the published manifest.
 catalogs:
   peers:
-    effect: ">=4.0.0-rc.118"
+    # Caret, not `>=`: on 0.x a minor release may break the combinator API
+    # the scanner is written against.
+    "@thomasfosterau/effect-parse": ^0.2.0
+    effect: ">=4.0.0"
 
 overrides:
   # `effect` MUST be a singleton (see the catalog comment): force every

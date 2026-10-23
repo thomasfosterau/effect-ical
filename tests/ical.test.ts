@@ -143,6 +143,45 @@ END:VCALENDAR
 
     expect(Result.isFailure(parseResult(ical))).toBe(true);
   });
+
+  it("locates a line without a colon (#7)", () => {
+    const ical =
+      "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nSUMMARY:a\r\n  folded\r\nno colon here\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+    const result = parseResult(ical);
+    assert(Result.isFailure(result));
+    // The message keeps the unfolded line's index; the position counts every
+    // physical line, the empty one and the fold included.
+    expect(result.failure.message).toBe(
+      "Error parsing content line at index 5: Invalid content line: no colon here",
+    );
+    expect(result.failure.line).toBe(8);
+    expect(result.failure.column).toBe(1);
+  });
+
+  it("locates an unclosed component at its BEGIN line (#7)", () => {
+    const ical = "junk\nBEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Test//EN\n";
+    const result = parseResult(ical);
+    assert(Result.isFailure(result));
+    expect(result.failure.message).toBe("Component VCALENDAR not closed");
+    expect(result.failure.line).toBe(2);
+    expect(result.failure.column).toBe(1);
+  });
+
+  it("leaves errors that belong to no line unlocated (#7)", () => {
+    const result = parseResult("no calendar here");
+    assert(Result.isFailure(result));
+    expect(result.failure.line).toBeUndefined();
+    expect(result.failure.column).toBeUndefined();
+  });
+
+  it("keeps a lone CR as line content and drops empty lines (#7)", () => {
+    const ical =
+      "\r\n\nBEGIN:VCALENDAR\nVERSION:2.0\r\n\r\n\nPRODID:a\rb\nNAME:x\n\n\ty\r\nEND:VCALENDAR";
+    const result = parseResult(ical);
+    assert(Result.isSuccess(result));
+    expect(result.success.prodid).toBe("a\rb");
+    expect(result.success.name).toBe("xy");
+  });
 });
 
 describe("iCalendar Encoder", () => {
