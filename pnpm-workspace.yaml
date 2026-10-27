@@ -49,7 +49,7 @@ catalog:
   # The dead-code / duplication / complexity gate (`.fallowrc.json`; the
   # Claude Code PreToolUse hook `.claude/hooks/fallow-gate.sh` runs
   # `fallow audit` before every agent `git commit` / `git push`).
-  fallow: 3.34.1
+  fallow: 3.36.0
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
   # until 7.1, so JS-API consumers (@effect/language-service, tsdown's
   # declaration bundler behind `vp pack`) stay on TS6 while native `tsc`
