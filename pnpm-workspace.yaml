@@ -45,7 +45,7 @@ catalog:
   # `effect` is a peerDependency of the published package and a devDependency
   # here, so the repo resolves exactly one copy while consumers bring their
   # own. Two copies break `Context` / `Layer` / `Schema` identity at runtime.
-  effect: 4.0.5
+  effect: 4.0.6
   # The dead-code / duplication / complexity gate (`.fallowrc.json`; the
   # Claude Code PreToolUse hook `.claude/hooks/fallow-gate.sh` runs
   # `fallow audit` before every agent `git commit` / `git push`).
