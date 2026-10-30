@@ -367,6 +367,11 @@ describe("VCard accessors", () => {
       ]),
     ).toEqual(Option.some({ value: "b", parameters: [{ name: "PREF", values: ["50"] }] }));
     expect(VCard.preferred([])).toEqual(Option.none());
+    const pref = (value: string): VCard.Property => ({
+      value,
+      parameters: [{ name: "PREF", values: [value] }],
+    });
+    expect(VCard.preferred([pref("high"), pref("1.5"), pref("7")])).toEqual(Option.some(pref("7")));
   });
 });
 
