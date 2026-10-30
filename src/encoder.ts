@@ -4,8 +4,8 @@
  *
  * Output uses CRLF line endings and folds every content line longer than 75
  * octets (UTF-8) onto continuation lines. Text-valued properties (`SUMMARY`,
- * `DESCRIPTION`, `LOCATION`, `NAME`) are escaped; every other value is written
- * verbatim. Optional string properties that are empty are omitted.
+ * `DESCRIPTION`, `LOCATION`, `NAME`, `TZNAME` and each `CATEGORIES` item) are
+ * escaped; every other value is written verbatim. Optional string properties that are empty are omitted.
  *
  * @module
  */
@@ -15,6 +15,7 @@ import * as Effect from "effect/Effect";
 import * as Record from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as ContentLine from "./ContentLine.js";
 import type * as Types from "./types.js";
 
 /**
@@ -30,74 +31,20 @@ export class EncodeError extends Schema.TaggedError<
   message: Schema.String,
 }) {}
 
-/** UTF-8 length of one code point (a lone surrogate encodes as U+FFFD: 3 octets). */
-const utf8Length = (char: string): number => {
-  const codePoint = char.codePointAt(0) ?? 0;
-  return codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
-};
-
-/** Octets on the first physical line; continuation lines carry one fewer after their leading space. */
-const firstLineOctets = 75;
-const continuationOctets = 74;
-
-interface FoldState {
-  readonly segment: number;
-  readonly octets: number;
-}
-
-/**
- * Fold a content line according to RFC 5545 §3.1: no physical line longer
- * than 75 octets (UTF-8), continuation lines starting with a space, and never
- * splitting a code point.
- */
-const foldLine = (line: string): string => {
-  const chars = Array.from(line);
-  const lengths = Arr.map(chars, utf8Length);
-  if (Arr.reduce(lengths, 0, (total, length) => total + length) <= firstLineOctets) {
-    return line;
-  }
-  const states = Arr.drop(
-    Arr.scan(lengths, { segment: 0, octets: 0 }, (state: FoldState, length): FoldState => {
-      const limit = state.segment === 0 ? firstLineOctets : continuationOctets;
-      return state.octets + length > limit
-        ? { segment: state.segment + 1, octets: length }
-        : { segment: state.segment, octets: state.octets + length };
-    }),
-    1,
-  );
-  const segments = Arr.groupBy(Arr.zip(chars, states), ([, state]) => String(state.segment));
-  return Arr.join(
-    Arr.map(
-      Record.values(segments),
-      (segment, index) =>
-        (index === 0 ? "" : " ") +
-        Arr.join(
-          Arr.map(segment, ([char]) => char),
-          "",
-        ),
-    ),
-    "\r\n",
-  );
-};
-
-/** Escape the characters RFC 5545 §3.3.11 reserves in TEXT values. */
-const escapeValue = (value: string): string =>
-  value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
-
 /** Format (and fold) a content line: `NAME[;PARAM=VALUE]*:VALUE`. */
 const formatContentLine = (
   name: string,
   value: string,
   params: Readonly<Record<string, string>> = {},
 ): string =>
-  foldLine(
-    name.toUpperCase() +
-      Arr.join(
-        Arr.map(Record.toEntries(params), ([key, param]) => `;${key.toUpperCase()}=${param}`),
-        "",
-      ) +
-      `:${value}`,
-  );
+  ContentLine.format({
+    name,
+    parameters: Arr.map(Record.toEntries(params), ([key, param]) => ({
+      name: key,
+      values: [param],
+    })),
+    value,
+  });
 
 /** A property line when `value` is a non-empty string, otherwise nothing. */
 const optional = (name: string, value?: string): ReadonlyArray<string> =>
@@ -105,7 +52,7 @@ const optional = (name: string, value?: string): ReadonlyArray<string> =>
 
 /** An escaped TEXT property line when `value` is a non-empty string, otherwise nothing. */
 const optionalText = (name: string, value?: string): ReadonlyArray<string> =>
-  value ? [formatContentLine(name, escapeValue(value))] : [];
+  value ? [formatContentLine(name, ContentLine.escapeText(value))] : [];
 
 /** A property line when `value` is a number (zero included), otherwise nothing. */
 const optionalNumber = (name: string, value?: number): ReadonlyArray<string> =>
@@ -149,7 +96,14 @@ const encodeEvent = (event: Types.VEvent): ReadonlyArray<string> =>
     optionalText("LOCATION", event.location),
     optional("ORGANIZER", event.organizer),
     each("ATTENDEE", event.attendee),
-    event.categories ? [formatContentLine("CATEGORIES", Arr.join(event.categories, ","))] : [],
+    event.categories
+      ? [
+          formatContentLine(
+            "CATEGORIES",
+            Arr.join(Arr.map(event.categories, ContentLine.escapeText), ","),
+          ),
+        ]
+      : [],
     optional("STATUS", event.status),
     optional("RRULE", event.rrule),
     each("RDATE", event.rdate),
@@ -223,7 +177,7 @@ const encodeObservance =
         formatContentLine("TZOFFSETTO", observance.tzoffsetto),
       ],
       optional("RRULE", observance.rrule),
-      optional("TZNAME", observance.tzname),
+      optionalText("TZNAME", observance.tzname),
     ]);
 
 const encodeTimezone = (timezone: Types.VTimezone): ReadonlyArray<string> =>

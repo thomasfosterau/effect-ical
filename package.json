@@ -2,7 +2,7 @@
   "$schema": "https://www.schemastore.org/package",
   "name": "@thomasfosterau/effect-ical",
   "version": "0.0.0",
-  "description": "iCalendar (RFC 5545) encoding and decoding for Effect: typed components, a parser, an encoder and pipeable builders.",
+  "description": "iCalendar (RFC 5545) and vCard (RFC 6350) encoding and decoding for Effect: typed components, parsers, encoders and pipeable builders.",
   "keywords": [
     "calendar",
     "decoder",
@@ -12,7 +12,9 @@
     "ical",
     "icalendar",
     "parser",
-    "rfc5545"
+    "rfc5545",
+    "rfc6350",
+    "vcard"
   ],
   "homepage": "https://www.npmjs.com/package/@thomasfosterau/effect-ical",
   "bugs": {

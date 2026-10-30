@@ -13,13 +13,15 @@
 // The barrel re-exports this module only as a namespace (`export * as Calendar`),
 // so its setter and `encode` names never collide with a sibling module's.
 // fallow-ignore-file duplicate-export
+import * as Compiler from "@thomasfosterau/effect-parse/Compiler";
+import * as Parser from "@thomasfosterau/effect-parse/Parser";
+import * as Token from "@thomasfosterau/effect-parse/Token";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Record from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import * as Str from "effect/String";
 import { Event } from "./Event.js";
 import { ParseError } from "./parser.js";
 import { Todo } from "./Todo.js";
@@ -214,6 +216,35 @@ const decodedProperties = [
   "METHOD",
 ] as const;
 
+/** Text up to a line ending; a lone `CR` is content. */
+const lineText = (stop: string) =>
+  Parser.fold(
+    Parser.alt(
+      Token.takeTill(`${stop}\r\n`, { min: 1 }),
+      Parser.terminated(Token.literal("\r"), Parser.not(Token.literal("\n"))),
+    ),
+    { init: () => "", f: (text: string, chunk: string) => text + chunk },
+  );
+
+/**
+ * The physical lines of a text (split at `\r\n` or `\n`, not unfolded), each
+ * as the key before its first `:` and, when it has one, the value after it.
+ */
+const keyValueLines = /*#__PURE__*/ Compiler.jit(
+  /*#__PURE__*/ Parser.separated(
+    /*#__PURE__*/ Parser.struct({
+      key: /*#__PURE__*/ lineText(":"),
+      value: /*#__PURE__*/ Parser.opt(
+        /*#__PURE__*/ Parser.preceded(/*#__PURE__*/ Token.literal(":"), /*#__PURE__*/ lineText("")),
+      ),
+    }),
+    /*#__PURE__*/ Parser.alt(
+      /*#__PURE__*/ Token.literal("\r\n"),
+      /*#__PURE__*/ Token.literal("\n"),
+    ),
+  ),
+);
+
 /**
  * Read a calendar's top-level properties (`PRODID`, `VERSION`, `NAME`,
  * `DESCRIPTION`, `CALSCALE`, `METHOD`) from iCalendar text, failing with a
@@ -230,13 +261,11 @@ export const decode = (icalString: string): Effect.Effect<Calendar, ParseError> 
   Effect.suspend(() => {
     const properties = Record.fromEntries(
       Arr.filterMap(
-        Arr.filter(icalString.split(/\r?\n/), (line) => Str.isNonEmpty(line.trim())),
-        (line) => {
-          const [key = "", ...valueParts] = line.split(":");
-          return Arr.contains(decodedProperties, key)
-            ? Result.succeed([key, Arr.join(valueParts, ":")] as const)
-            : Result.failVoid;
-        },
+        Result.getOrElse(Parser.parse(keyValueLines, icalString), () => []),
+        ({ key, value }) =>
+          Arr.contains(decodedProperties, key)
+            ? Result.succeed([key, Option.getOrElse(value, () => "")] as const)
+            : Result.failVoid,
       ),
     );
     const property = (key: (typeof decodedProperties)[number]) => Record.get(properties, key);

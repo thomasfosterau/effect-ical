@@ -1,10 +1,10 @@
 # @thomasfosterau/effect-ical
 
-iCalendar ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)) encoding and decoding for [Effect](https://effect.website): a typed object model for `VCALENDAR` data, a parser and an encoder (as pure `Result` functions and as Effects), fluent builders, and pipeable `Calendar` / `Event` / `Todo` modules.
+iCalendar ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)) and vCard ([RFC 6350](https://datatracker.ietf.org/doc/html/rfc6350)) encoding and decoding for [Effect](https://effect.website): a typed object model for `VCALENDAR` data, a parser and an encoder (as pure `Result` functions and as Effects), fluent builders, pipeable `Calendar` / `Event` / `Todo` modules, a vCard 4.0 codec, and the content-line layer the two formats share.
 
 - Components: `VEVENT`, `VTODO`, `VJOURNAL`, `VFREEBUSY`, `VTIMEZONE` (with `STANDARD` / `DAYLIGHT`) and `VALARM`.
 - The encoder escapes TEXT values, folds lines at 75 octets (UTF-8, never splitting a character) and writes CRLF line endings; the parser unfolds lines and collects repeatable properties (`ATTENDEE`, `CATEGORIES`, `RDATE`, `EXDATE`) into arrays.
-- Values stay verbatim strings: dates, durations and recurrence rules are not decoded, and parsed TEXT values are not unescaped.
+- TEXT values are unescaped when parsed and escaped when encoded, so `parse(encode(calendar))` round-trips them. Other values stay verbatim strings: dates, durations and recurrence rules are not decoded.
 - Failures are tagged errors (`ParseError`, `EncodeError`, `BuildError`) you can handle with `Effect.catchTag`.
 
 | Package | Purpose | Peers |
@@ -62,7 +62,7 @@ Everything is exported from the package root.
 | `parseResult` | `(text: string) => Result<VCalendar, ParseError>` | The same parse, synchronously. |
 | `ParseError` | tagged error, `_tag: "ParseError"`, `message`, optional `line` / `column` | No `VCALENDAR`, an unclosed calendar, a line without `:`, a missing or non-`2.0` `VERSION`, or a missing `PRODID`. For a line without `:` or an unclosed component, `line` and `column` (1-based) locate the offending line or the component's `BEGIN` line. |
 
-Text before the first `BEGIN:VCALENDAR` and after its `END:VCALENDAR` is ignored, and so are components of an unknown type. Property names become lower-cased fields (`PERCENT-COMPLETE` → `percent`, `LAST-MODIFIED` → `lastmod`, `X-WR-CALNAME` → `"x-wr-calname"`); `PRIORITY`, `PERCENT-COMPLETE`, `REPEAT` and `SEQUENCE` become numbers when they are integers. Property parameters (`;TZID=…`) are dropped.
+Text before the first `BEGIN:VCALENDAR` and after its `END:VCALENDAR` is ignored, and so are components of an unknown type. Property names become lower-cased fields (`PERCENT-COMPLETE` → `percent`, `LAST-MODIFIED` → `lastmod`, `X-WR-CALNAME` → `"x-wr-calname"`); `PRIORITY`, `PERCENT-COMPLETE`, `REPEAT` and `SEQUENCE` become numbers when they are integers. TEXT values (`SUMMARY`, `DESCRIPTION`, `LOCATION`, `COMMENT`, `CONTACT`, `NAME`, `TZNAME`, `X-WR-CALNAME`, `X-WR-CALDESC`) are unescaped (`\\`, `\;`, `\,`, `\n` / `\N`; other backslash sequences are kept), and each `CATEGORIES` line splits at its unescaped commas. Property parameters (`;TZID=…`) are dropped.
 
 ```ts
 import { parseResult } from "@thomasfosterau/effect-ical";
@@ -87,7 +87,7 @@ if (Result.isSuccess(result)) {
 | `encodeSync` | `(calendar: VCalendar) => string` | Throws the `EncodeError`. |
 | `EncodeError` | tagged error, `_tag: "EncodeError"`, `message` | `version` or `prodid` missing or empty (only possible for a value that bypassed the types). |
 
-Components are written in a fixed order: timezones, events, to-dos, journals, free/busy. Optional string properties that are empty are omitted; numeric ones (`priority`, `percent`, `repeat`) are written whenever set, `0` included. `SUMMARY`, `DESCRIPTION`, `LOCATION` and `NAME` are escaped (`\`, `;`, `,`, newline); every other value is written as given.
+Components are written in a fixed order: timezones, events, to-dos, journals, free/busy. Optional string properties that are empty are omitted; numeric ones (`priority`, `percent`, `repeat`) are written whenever set, `0` included. `SUMMARY`, `DESCRIPTION`, `LOCATION`, `NAME`, `TZNAME` and each `CATEGORIES` item are escaped (`\`, `;`, `,`, newline); every other value is written as given.
 
 ### The object model
 
@@ -185,13 +185,83 @@ const text = await Effect.runPromise(Calendar.encode(calendar));
   - `encode(calendar): Effect<string>`: a compact rendering. Values are not escaped or folded, and only an event's `DTSTART`, `UID`, `SUMMARY`, `DTEND`, `DESCRIPTION`, `LOCATION`, `STATUS` and a to-do's `UID`, `SUMMARY`, `DTSTART`, `DUE`, `STATUS`, `PERCENT-COMPLETE` are written. For complete output, use the root `encode` on a `VCalendar`.
   - `decode(text): Effect<Calendar, ParseError>`: a shallow reader of the top-level `PRODID`, `VERSION`, `NAME`, `DESCRIPTION`, `CALSCALE` and `METHOD`. It does not unfold lines or read components, and a matching line inside a component also counts (the last one wins). For a full parse, use the root `parse`.
 
+### Content lines: `ContentLine`
+
+`ContentLine` is the line syntax iCalendar shares with vCard (RFC 5545 §3.1, RFC 6350 §3.3): `[group "."] name *(";" param) ":" value`, folded at 75 octets. It knows nothing about components; the iCalendar parser and encoder are built on it, and so can other formats.
+
+| Export | Signature | Notes |
+| --- | --- | --- |
+| `ContentLine.unfold` | `(text) => ReadonlyArray<{ text, offset }>` | Unfolds continuation lines; splits at `\r\n` or `\n`; drops empty lines. |
+| `ContentLine.parse` | `(line) => Result<ContentLine, ContentLineError>` | One unfolded line. The value starts at the first `:` outside a quoted parameter value; names and parameter names are upper-cased; parameter values are unquoted and RFC 6868 caret-decoded (`^n`, `^'`, `^^`); the value is verbatim. |
+| `ContentLine.parseAll` | `(text) => Result<ReadonlyArray<ContentLine>, ContentLineError>` | Unfolds and parses every line; the error carries the failing line's 1-based `line` / `column`. |
+| `ContentLine.format` | `(line) => string` | Writes and folds a line, quoting parameter values that contain `:`, `;` or `,` and caret-encoding them. The value is written as given. |
+| `ContentLine.getParameter` | `(line, name) => Option<ReadonlyArray<string>>` | The first parameter's values, by case-insensitive name. |
+| `ContentLine.escapeText` / `unescapeText` | `(value) => string` | TEXT escaping (`\\`, `\;`, `\,`, `\n`); unescaping also reads `\N` and keeps unknown escapes. |
+| `ContentLine.splitValue` | `(value, ";" \| ",") => ReadonlyArray<string>` | Splits at unescaped separators only, for structured values such as vCard `N` and `ADR`. |
+| `ContentLine.fold` | `(line) => string` | Folds a formatted line at 75 octets (UTF-8) without splitting a code point. |
+
+```ts
+import { ContentLine } from "@thomasfosterau/effect-ical";
+import * as Result from "effect/Result";
+
+const line = Result.getOrThrow(
+  ContentLine.parse('ATTENDEE;CN="Doe, Jane";PARTSTAT=ACCEPTED:mailto:jane@example.com'),
+);
+line.parameters; // [{ name: "CN", values: ["Doe, Jane"] }, { name: "PARTSTAT", values: ["ACCEPTED"] }]
+line.value; // "mailto:jane@example.com"
+
+ContentLine.format(line); // 'ATTENDEE;CN="Doe, Jane";PARTSTAT=ACCEPTED:mailto:jane@example.com'
+```
+
+The root `parse` does not use `ContentLine.parse` yet: it still splits each line at its first `:` and drops parameters, as its golden corpus pins (keeping parameters is #22).
+
+### vCard 4.0: `VCard`
+
+`VCard` reads and writes vCard 4.0 ([RFC 6350](https://datatracker.ietf.org/doc/html/rfc6350)) contact cards on the same content-line layer. A `.vcf` input may hold any number of cards.
+
+| Export | Signature | Notes |
+| --- | --- | --- |
+| `VCard.parse` | `(text) => Effect<ReadonlyArray<VCard>, VCardParseError>` | Runs when the Effect runs. |
+| `VCard.parseResult` | `(text) => Result<ReadonlyArray<VCard>, VCardParseError>` | Synchronous. Lines outside cards are ignored. Fails on a malformed line inside a card (with `line` / `column`), an unclosed or nested card, and a card without `VERSION:4.0` or `FN`. |
+| `VCard.encode` / `encodeResult` | `(card \| cards) => Effect<string, VCardEncodeError>` / `Result<…>` | Writes `BEGIN`, `VERSION:4.0`, the typed properties in a fixed order, then `extra` in its order; folds at 75 octets; CRLF. |
+| `VCard.make` | `(fn) => VCard` | A minimal card. |
+| `VCard.types` | `(property) => ReadonlyArray<string>` | The `TYPE` values, lower-cased, with `TYPE="work,voice"` split. |
+| `VCard.preferred` | `(properties) => Option<Property>` | The property with the lowest `PREF`. |
+
+Every property instance is a `Property<A>`: `{ value, parameters?, group? }`. Fields are named after their properties (`fn`, `n`, `email`, `tel`, `adr`, `org`, …); `fn` is a non-empty list, the at-most-once properties (`n`, `bday`, `anniversary`, `gender`, `prodid`, `rev`, `uid`, `kind`) are single, and the rest are lists.
+
+- TEXT values (`FN`, `NOTE`, `EMAIL`, `TITLE`, `ROLE`, …) are unescaped, unless the property says `VALUE=uri`; `NICKNAME` and `CATEGORIES` are comma lists.
+- `N` (5 components), `ADR` (7) and `GENDER` (sex; identity) are structured, each `N` / `ADR` component a list; `ORG` is the organisation name then its units.
+- URIs, dates and other values (`TEL`, `URL`, `PHOTO`, `BDAY`, `TZ`, `UID`, …) are verbatim strings.
+- Nothing is lost: properties the model does not type (`X-…`, `item1.X-ABLabel`), a second `UID`, and an `N` or `ADR` with too many components are kept in `extra` in their order and written back.
+
+vCard 3.0 and 2.1 are not read yet ([#27](https://github.com/thomasfosterau/effect-ical/issues/27)).
+
+```ts
+import { VCard } from "@thomasfosterau/effect-ical";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
+
+const [jane] = Result.getOrThrow(
+  VCard.parseResult(
+    "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane Doe\r\nN:Doe;Jane;;;\r\n" +
+      "EMAIL;TYPE=work;PREF=1:jane@work.example\r\nEND:VCARD\r\n",
+  ),
+);
+jane?.n?.value.givenNames; // ["Jane"]
+Option.map(VCard.preferred(jane?.email ?? []), (email) => email.value); // Some("jane@work.example")
+
+const text = Result.getOrThrow(VCard.encodeResult(VCard.make("John Doe")));
+// "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:John Doe\r\nEND:VCARD\r\n"
+```
+
 ## Examples
 
-The repository's `examples/` directory has three runnable programs, one per API style; its test suite runs each of them.
+The repository's `examples/` directory has four runnable programs, one per API style plus one for vCard; its test suite runs each of them.
 
 ## Standards
 
-Implements RFC 5545 content lines, components and escaping. Extensions from RFC 5546 (iTIP), RFC 6868 (parameter encoding), RFC 7529 (non-Gregorian recurrence) and RFC 7986 (new properties) are not implemented, though their properties pass through the parser as plain fields.
+Implements RFC 5545 content lines, components and escaping. `ContentLine` implements RFC 6868 parameter value encoding. Extensions from RFC 5546 (iTIP), RFC 7529 (non-Gregorian recurrence) and RFC 7986 (new properties) are not implemented, though their properties pass through the parser as plain fields.
 
 ## Changelog
 

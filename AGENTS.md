@@ -11,9 +11,11 @@
 `src/` modules and their boundaries:
 
 - `types.ts`: the plain object model (`VCalendar`, `VEvent`, `VTodo`, `VJournal`, `VFreeBusy`, `VTimezone`, `VAlarm`). Types only.
-- `parser.ts`: text → `VCalendar` (`parseResult`, `parse`, `ParseError`). Pure; values are kept verbatim (no unescaping, no date decoding).
+- `ContentLine.ts`: the content-line syntax iCalendar shares with vCard (`unfold`, `parse` / `parseAll`, `format` / `fold`, parameters with RFC 6868 encoding, TEXT escaping and splitting), exported as a namespace. Pure; no component knowledge.
+- `parser.ts`: text → `VCalendar` (`parseResult`, `parse`, `ParseError`). Pure; TEXT values are unescaped, everything else is kept verbatim (no date decoding).
 - `encoder.ts`: `VCalendar` → text (`encodeResult`, `encode`, `encodeSync`, `EncodeError`). Pure; escapes TEXT values, folds at 75 octets, CRLF.
 - `builder.ts`: mutable fluent builders over the object model (`createCalendar`, `createEvent`, `createTodo`, `BuildError`).
+- `VCard.ts`: the vCard 4.0 (RFC 6350) model, parser and encoder on `ContentLine`, exported as a namespace. Lossless: untyped properties stay in `extra`. Pure.
 - `Calendar.ts`, `Event.ts`, `Todo.ts`: Schema classes with pipeable setters, re-exported from `index.ts` as namespaces (`export * as Event`). `Calendar.encode` / `Calendar.decode` are a compact rendering and a shallow reader, not the full codec: see their doc comments.
 
 ## Common pitfalls

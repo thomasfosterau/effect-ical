@@ -11,9 +11,16 @@
  * with its golden output, and never regenerate the golden file to make a
  * behaviour change pass.
  *
- * One deliberate change is recorded in the golden file by hand: the Effect 3
- * `Calendar.decode` failed with a bare `Error` (tag `"Error"`); it now fails
- * with the tagged `ParseError`, with the same messages.
+ * Deliberate changes are recorded in the golden file by hand:
+ *
+ * - The Effect 3 `Calendar.decode` failed with a bare `Error` (tag
+ *   `"Error"`); it now fails with the tagged `ParseError`, with the same
+ *   messages.
+ * - #23: the parser unescapes TEXT values and splits each `CATEGORIES` line
+ *   at its unescaped commas, so `parse(encode(x))` round-trips. In
+ *   `parse.everyComponent`, the summary `Event\, escaped` became
+ *   `Event, escaped`, and the categories `WORK,MEETING` became `WORK` and
+ *   `MEETING`.
  *
  * The only seam is how an Effect is run (`Run`); the golden file was produced
  * by running this corpus against the Effect 3 sources.
