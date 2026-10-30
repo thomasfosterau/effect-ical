@@ -15,7 +15,7 @@
 
 import { defineConfig } from "vite-plus";
 import { recommended } from "@effect/tsgo/oxlint-presets";
-import effect from "@mpsuesser/oxlint-plugin-effect";
+import effect from "@enfect/oxlint";
 
 /**
  * Input fingerprint for the cached tasks: auto tracking minus node_modules
@@ -48,8 +48,13 @@ export default defineConfig({
   lint: {
     ignorePatterns: ["**/dist/**", "**/coverage/**", "**/node_modules/**"],
     extends: [recommended, effect.configs.recommended],
+    // Oxlint's built-in plugins beyond the default set: `import`, `promise`,
+    // `vitest` and `jsdoc` add their correctness / suspicious / perf rules.
+    plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "promise", "vitest", "jsdoc"],
     categories: {
       correctness: "error",
+      suspicious: "error",
+      perf: "error",
     },
     rules: {
       "eslint/no-unused-vars": [
@@ -79,6 +84,18 @@ export default defineConfig({
       // "effect/Option"`) this family shares with its consumers.
       "effect/prefer-namespace-imports": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
+      // `@category` is the docs vocabulary every export carries (AGENTS.md);
+      // the rest of the JSDoc tag set stays checked.
+      "jsdoc/check-tag-names": ["error", { definedTags: ["category"] }],
+      // `_tag` is Effect's discriminant (tagged errors, `Result`, `Option`),
+      // so a leading or trailing underscore is the library's naming, not a
+      // private marker.
+      "eslint/no-underscore-dangle": "off",
+      // The setters copy a Schema class instance's fields into its own
+      // constructor (`new Event({ ...event, summary })`), and the tests spread
+      // instances into plain records on purpose: the dropped prototype is the
+      // point, and `new` restores it in `src/`.
+      "typescript/no-misused-spread": "off",
     },
     overrides: [
       // This file is evaluated by Vite and Vitest in bare Node, before any
@@ -103,10 +120,12 @@ export default defineConfig({
         },
       },
     ],
-    // Type-aware linting is intentionally disabled: type checking stays the
-    // `check` task's job (native tsc, Effect-patched).
+    // Type-aware rules run (tsgolint, patched by @effect/tsgo, so the
+    // `effecttsgo/*` diagnostics report here too); full type checking stays
+    // the `check` task's job (native tsc, Effect-patched), so `typeCheck` is
+    // off and `vp check` does not type-check twice.
     options: {
-      typeAware: false,
+      typeAware: true,
       typeCheck: false,
     },
     jsPlugins: [

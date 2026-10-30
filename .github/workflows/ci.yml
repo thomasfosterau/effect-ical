@@ -10,6 +10,11 @@ name: CI
 #
 # Every third-party action is pinned to a full commit SHA (the tag is a comment
 # for humans; Dependabot's `github-actions` ecosystem keeps both current).
+#
+# Hardened for Dependabot PRs (and any other PR): `pull_request`, never
+# `pull_request_target`; no secrets, no OIDC, read-only `contents`; the
+# checkout does not persist its token. `zizmor .github` reports no warning
+# or error (.github/zizmor.yml sets the cooldown to the owner's 1 day).
 
 on:
   pull_request:
@@ -49,18 +54,18 @@ jobs:
           restore-keys: |
             vp-task-v1-${{ runner.os }}-
       - name: Format and lint
-        run: vp check
+        run: pnpm exec vp check
       # Native TS7 type-check (`tsc`, patched by @effect/tsgo on install) of
       # `src`, then of `src`, `tests` and `examples`.
       - name: Type gate
-        run: vp run check
+        run: pnpm exec vp run check
       - name: Unit tests
-        run: vp run test:unit
+        run: pnpm exec vp run test:unit
       # The suite again under Istanbul, failing if `src/` coverage drops below
       # the thresholds in vite.config.ts.
       - name: Coverage thresholds
-        run: vp run test:coverage
+        run: pnpm exec vp run test:coverage
       - name: Build
-        run: vp run build
+        run: pnpm exec vp run build
       - name: Audit
         run: pnpm audit --audit-level high

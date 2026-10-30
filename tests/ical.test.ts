@@ -389,15 +389,15 @@ describe("Round-trip encoding and parsing", () => {
   });
 });
 
-describe("numeric properties", () => {
-  const priorityOf = (value: string) => {
-    const result = parseResult(
-      `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:x\nBEGIN:VEVENT\nDTSTART:1\nPRIORITY:${value}\nEND:VEVENT\nEND:VCALENDAR\n`,
-    );
-    assert(Result.isSuccess(result));
-    return result.success.events?.[0]?.priority;
-  };
+const priorityOf = (value: string) => {
+  const result = parseResult(
+    `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:x\nBEGIN:VEVENT\nDTSTART:1\nPRIORITY:${value}\nEND:VEVENT\nEND:VCALENDAR\n`,
+  );
+  assert(Result.isSuccess(result));
+  return result.success.events?.[0]?.priority;
+};
 
+describe("numeric properties", () => {
   it("reads a leading integer, as parseInt did", () => {
     expect(priorityOf("5")).toBe(5);
     expect(priorityOf(" +7")).toBe(7);
@@ -412,13 +412,13 @@ describe("numeric properties", () => {
   });
 });
 
-describe("TEXT round-trip (#23)", () => {
-  const roundTrip = (calendar: VCalendar): VCalendar => {
-    const result = parseResult(encodeSync(calendar));
-    assert(Result.isSuccess(result));
-    return result.success;
-  };
+const roundTrip = (calendar: VCalendar): VCalendar => {
+  const result = parseResult(encodeSync(calendar));
+  assert(Result.isSuccess(result));
+  return result.success;
+};
 
+describe("TEXT round-trip (#23)", () => {
   it("unescapes TEXT values the encoder escaped", () => {
     const tricky = "Lunch; then 1:1, at C:\\Temp\nBring notes";
     const calendar: VCalendar = {
