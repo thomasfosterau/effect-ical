@@ -274,7 +274,7 @@ const propertyOf = <A>(line: ContentLine.ContentLine, value: A): Property<A> => 
 type Decoder<A> = (line: ContentLine.ContentLine) => Option.Option<A>;
 
 /** A TEXT value, unescaped (verbatim when the line says `VALUE=uri`). */
-const text: Decoder<string> = (line) =>
+const textValue: Decoder<string> = (line) =>
   Option.some(isUri(line.parameters) ? line.value : ContentLine.unescapeText(line.value));
 
 /** A value kept verbatim: URIs, dates, language tags. */
@@ -412,7 +412,7 @@ const toCard = (
   const byName = Arr.groupBy(indexed, ({ line }) => line.name);
   const takeOf = take(byName);
   const fields = {
-    fn: takeOf("FN", text),
+    fn: takeOf("FN", textValue),
     n: takeOf("N", name, 1),
     nickname: takeOf("NICKNAME", textList),
     photo: takeOf("PHOTO", raw),
@@ -421,20 +421,20 @@ const toCard = (
     gender: takeOf("GENDER", gender, 1),
     adr: takeOf("ADR", address),
     tel: takeOf("TEL", raw),
-    email: takeOf("EMAIL", text),
+    email: takeOf("EMAIL", textValue),
     impp: takeOf("IMPP", raw),
     lang: takeOf("LANG", raw),
     tz: takeOf("TZ", raw),
     geo: takeOf("GEO", raw),
-    title: takeOf("TITLE", text),
-    role: takeOf("ROLE", text),
+    title: takeOf("TITLE", textValue),
+    role: takeOf("ROLE", textValue),
     logo: takeOf("LOGO", raw),
     org: takeOf("ORG", organization),
     member: takeOf("MEMBER", raw),
     related: takeOf("RELATED", raw),
     categories: takeOf("CATEGORIES", textList),
-    note: takeOf("NOTE", text),
-    prodid: takeOf("PRODID", text, 1),
+    note: takeOf("NOTE", textValue),
+    prodid: takeOf("PRODID", textValue, 1),
     rev: takeOf("REV", raw, 1),
     sound: takeOf("SOUND", raw),
     uid: takeOf("UID", raw, 1),
@@ -444,8 +444,8 @@ const toCard = (
     fburl: takeOf("FBURL", raw),
     caladruri: takeOf("CALADRURI", raw),
     caluri: takeOf("CALURI", raw),
-    kind: takeOf("KIND", text, 1),
-    xml: takeOf("XML", text),
+    kind: takeOf("KIND", textValue, 1),
+    xml: takeOf("XML", textValue),
     source: takeOf("SOURCE", raw),
   };
   const fn = fields.fn.properties;

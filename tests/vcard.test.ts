@@ -346,6 +346,11 @@ describe("VCard.encodeResult", () => {
   });
 });
 
+const pref = (value: string): VCard.Property => ({
+  value,
+  parameters: [{ name: "PREF", values: [value] }],
+});
+
 describe("VCard accessors", () => {
   it("reads TYPE values, splitting quoted comma lists", () => {
     const card = parseOne(rfcExample);
@@ -367,10 +372,6 @@ describe("VCard accessors", () => {
       ]),
     ).toEqual(Option.some({ value: "b", parameters: [{ name: "PREF", values: ["50"] }] }));
     expect(VCard.preferred([])).toEqual(Option.none());
-    const pref = (value: string): VCard.Property => ({
-      value,
-      parameters: [{ name: "PREF", values: [value] }],
-    });
     expect(VCard.preferred([pref("high"), pref("1.5"), pref("7")])).toEqual(Option.some(pref("7")));
   });
 });

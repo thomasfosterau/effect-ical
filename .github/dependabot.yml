@@ -13,18 +13,30 @@
 #   `@typescript/typescript6`, `@typescript/native` of `typescript@7`),
 #   `@effect/tsgo` (whose `effect-tsgo patch` hard-errors on any TypeScript /
 #   oxlint pairing it ships no artifact for, failing `pnpm install`) and the
-#   oxlint plugin. Read the catalog comments in pnpm-workspace.yaml before
-#   merging one of these.
+#   Effect oxlint plugin `@enfect/oxlint`. Read the catalog comments in
+#   pnpm-workspace.yaml before merging one of these.
 # - `effect`: `effect` + `@effect/*` (the Effect line moves as one), except
 #   `@effect/tsgo`, which belongs to the toolchain.
 # - `changesets`, `fallow`: one PR each.
 # - `npm-minor-and-patch`: everything else, minor and patch only, so a major
 #   bump of an ungrouped dependency arrives on its own.
 #
-# `cooldown` mirrors pnpm-workspace.yaml's `minimumReleaseAge` (1 day) so
-# Dependabot never proposes a version pnpm's supply-chain gate would then
-# reject at install time; `@thomasfosterau/*` is exempt there and here.
-# Cooldown applies only to version updates: security updates open at once.
+# Hand moves Dependabot cannot make (do them on the toolchain PR's branch):
+# - the npm-alias catalog entries: `vite` (`npm:@voidzero-dev/vite-plus-core`,
+#   must equal `vite-plus`), `typescript` (`npm:@typescript/typescript6`) and
+#   `@typescript/native` (`npm:typescript`, must match `@effect/tsgo`'s
+#   `components` table);
+# - `@effect/tsgo` itself when the new vite-plus carries an oxlint /
+#   oxlint-tsgolint the pinned release does not list;
+# - the `vite@*` / `vitest@*` / `effect` overrides follow their catalog
+#   entries and need no edit of their own.
+#
+# `cooldown` is 1 day, the shortest Dependabot allows (whole days only). That
+# is longer than pnpm-workspace.yaml's `minimumReleaseAge` (480 minutes, 8
+# hours), so Dependabot never proposes a version pnpm's supply-chain gate
+# would still reject at install time; `@thomasfosterau/*` is exempt there and
+# here. Cooldown applies only to version updates: security updates open at
+# once.
 version: 2
 updates:
   - package-ecosystem: "npm" # covers the pnpm-lock.yaml lockfile
@@ -57,7 +69,8 @@ updates:
           - "@typescript/native"
           - "typescript"
           - "@typescript/typescript6"
-          - "@mpsuesser/oxlint-plugin-effect"
+          - "@oxlint/*"
+          - "@enfect/oxlint"
         update-types: ["major", "minor", "patch"]
       effect:
         applies-to: version-updates

@@ -1,0 +1,8 @@
+# zizmor (GitHub Actions static analysis) configuration, read by
+# `zizmor .github`. The owner's supply-chain wait is pnpm's
+# `minimumReleaseAge` (8 hours, pnpm-workspace.yaml); Dependabot's cooldown
+# only takes whole days, so it is 1 day, not zizmor's default 7.
+rules:
+  dependabot-cooldown:
+    config:
+      days: 1

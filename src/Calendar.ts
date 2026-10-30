@@ -81,9 +81,9 @@ export const builder = (): Builder => ({
  */
 export const withProdid =
   (prodid: string) =>
-  (builder: Builder): Builder => ({
-    ...builder,
-    calendar: new Calendar({ ...builder.calendar, prodid }),
+  (current: Builder): Builder => ({
+    ...current,
+    calendar: new Calendar({ ...current.calendar, prodid }),
   });
 
 /**
@@ -91,9 +91,9 @@ export const withProdid =
  */
 export const withName =
   (name: string) =>
-  (builder: Builder): Builder => ({
-    ...builder,
-    calendar: new Calendar({ ...builder.calendar, name }),
+  (current: Builder): Builder => ({
+    ...current,
+    calendar: new Calendar({ ...current.calendar, name }),
   });
 
 /**
@@ -101,9 +101,9 @@ export const withName =
  */
 export const withDescription =
   (description: string) =>
-  (builder: Builder): Builder => ({
-    ...builder,
-    calendar: new Calendar({ ...builder.calendar, description }),
+  (current: Builder): Builder => ({
+    ...current,
+    calendar: new Calendar({ ...current.calendar, description }),
   });
 
 /**
@@ -111,9 +111,9 @@ export const withDescription =
  */
 export const withCalscale =
   (calscale: "GREGORIAN") =>
-  (builder: Builder): Builder => ({
-    ...builder,
-    calendar: new Calendar({ ...builder.calendar, calscale }),
+  (current: Builder): Builder => ({
+    ...current,
+    calendar: new Calendar({ ...current.calendar, calscale }),
   });
 
 /**
@@ -121,9 +121,9 @@ export const withCalscale =
  */
 export const withMethod =
   (method: string) =>
-  (builder: Builder): Builder => ({
-    ...builder,
-    calendar: new Calendar({ ...builder.calendar, method }),
+  (current: Builder): Builder => ({
+    ...current,
+    calendar: new Calendar({ ...current.calendar, method }),
   });
 
 /**
@@ -131,11 +131,11 @@ export const withMethod =
  */
 export const withEvent =
   (event: Event) =>
-  (builder: Builder): Builder => ({
-    ...builder,
+  (current: Builder): Builder => ({
+    ...current,
     calendar: new Calendar({
-      ...builder.calendar,
-      events: [...(builder.calendar.events || []), event],
+      ...current.calendar,
+      events: [...(current.calendar.events || []), event],
     }),
   });
 
@@ -144,18 +144,18 @@ export const withEvent =
  */
 export const withTodo =
   (todo: Todo) =>
-  (builder: Builder): Builder => ({
-    ...builder,
+  (current: Builder): Builder => ({
+    ...current,
     calendar: new Calendar({
-      ...builder.calendar,
-      todos: [...(builder.calendar.todos || []), todo],
+      ...current.calendar,
+      todos: [...(current.calendar.todos || []), todo],
     }),
   });
 
 /**
  * Finish a calendar pipeline, returning the calendar.
  */
-export const build = (builder: Builder): Calendar => builder.calendar;
+export const build = (current: Builder): Calendar => current.calendar;
 
 /**
  * Render a calendar as iCalendar text: its top-level properties, then each

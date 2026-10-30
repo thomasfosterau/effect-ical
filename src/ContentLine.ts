@@ -244,7 +244,7 @@ const quotedValue = /*#__PURE__*/ Parser.delimited(
 /** A parameter value, quoted or not (`paramtext` stops at `"`, `;`, `:` and `,`). */
 const parameterValue = /*#__PURE__*/ Parser.alt(quotedValue, /*#__PURE__*/ caretText('";:,'));
 
-const parameter = /*#__PURE__*/ Parser.map(
+const parameterGrammar = /*#__PURE__*/ Parser.map(
   /*#__PURE__*/ Parser.seq(
     /*#__PURE__*/ Token.takeTill("=;:", { min: 1 }),
     /*#__PURE__*/ Parser.opt(
@@ -286,7 +286,7 @@ const contentLine = /*#__PURE__*/ Compiler.jit(
       /*#__PURE__*/ Parser.seq(
         groupAndName,
         /*#__PURE__*/ Parser.repeat(
-          /*#__PURE__*/ Parser.preceded(/*#__PURE__*/ Token.literal(";"), parameter),
+          /*#__PURE__*/ Parser.preceded(/*#__PURE__*/ Token.literal(";"), parameterGrammar),
         ),
         /*#__PURE__*/ Parser.preceded(
           /*#__PURE__*/ Parser.context(/*#__PURE__*/ Token.literal(":"), "a ':' before the value"),

@@ -335,6 +335,21 @@ const isCalendarBegin = (line: Line): boolean =>
   });
 
 /**
+ * A raw field as text, the way `String()` renders a property value (a
+ * repeated property's values joined by `,`). A sub-component list never sits
+ * under a property's field name, so it renders as a placeholder.
+ */
+const describeField = (value: PropertyValue | ReadonlyArray<RawComponent>): string =>
+  Predicate.isString(value) || Predicate.isNumber(value)
+    ? String(value)
+    : Arr.join(
+        Arr.map(value, (item: string | number | RawComponent) =>
+          Predicate.isString(item) || Predicate.isNumber(item) ? String(item) : "[component]",
+        ),
+        ",",
+      );
+
+/**
  * Validate the parsed `VCALENDAR` and sort its children into the
  * {@link Types.VCalendar} component lists.
  */
@@ -346,7 +361,7 @@ const toCalendar = ({ component: calendar, children }: ParsedComponent) => {
   }
   if (version !== "2.0") {
     return Result.fail(
-      new ParseError({ message: `VERSION must be "2.0", got "${String(version)}"` }),
+      new ParseError({ message: `VERSION must be "2.0", got "${describeField(version)}"` }),
     );
   }
   if (!prodid || !Predicate.isString(prodid)) {
@@ -372,16 +387,16 @@ const toCalendar = ({ component: calendar, children }: ParsedComponent) => {
     },
     Arr.isReadonlyArrayNonEmpty,
   );
-  // SAFETY: the parser does not validate component contents; it keeps every
-  // property value verbatim (a CALSCALE other than GREGORIAN, an event without
-  // DTSTART) and sorts components by their `BEGIN` type, as it always has.
-  return Result.succeed({
+  // The parser does not validate component contents; it keeps every property
+  // value verbatim (a CALSCALE other than GREGORIAN, an event without DTSTART)
+  // and sorts components by their `BEGIN` type, as it always has.
+  return Result.succeed<Types.VCalendar>({
     component: "VCALENDAR",
     prodid,
     version,
     ...properties,
     ...components,
-  } as Types.VCalendar);
+  });
 };
 
 /**
