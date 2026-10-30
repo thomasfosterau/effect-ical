@@ -185,13 +185,43 @@ const text = await Effect.runPromise(Calendar.encode(calendar));
   - `encode(calendar): Effect<string>`: a compact rendering. Values are not escaped or folded, and only an event's `DTSTART`, `UID`, `SUMMARY`, `DTEND`, `DESCRIPTION`, `LOCATION`, `STATUS` and a to-do's `UID`, `SUMMARY`, `DTSTART`, `DUE`, `STATUS`, `PERCENT-COMPLETE` are written. For complete output, use the root `encode` on a `VCalendar`.
   - `decode(text): Effect<Calendar, ParseError>`: a shallow reader of the top-level `PRODID`, `VERSION`, `NAME`, `DESCRIPTION`, `CALSCALE` and `METHOD`. It does not unfold lines or read components, and a matching line inside a component also counts (the last one wins). For a full parse, use the root `parse`.
 
+### Content lines: `ContentLine`
+
+`ContentLine` is the line syntax iCalendar shares with vCard (RFC 5545 §3.1, RFC 6350 §3.3): `[group "."] name *(";" param) ":" value`, folded at 75 octets. It knows nothing about components; the iCalendar parser and encoder are built on it, and so can other formats.
+
+| Export | Signature | Notes |
+| --- | --- | --- |
+| `ContentLine.unfold` | `(text) => ReadonlyArray<{ text, offset }>` | Unfolds continuation lines; splits at `\r\n` or `\n`; drops empty lines. |
+| `ContentLine.parse` | `(line) => Result<ContentLine, ContentLineError>` | One unfolded line. The value starts at the first `:` outside a quoted parameter value; names and parameter names are upper-cased; parameter values are unquoted and RFC 6868 caret-decoded (`^n`, `^'`, `^^`); the value is verbatim. |
+| `ContentLine.parseAll` | `(text) => Result<ReadonlyArray<ContentLine>, ContentLineError>` | Unfolds and parses every line; the error carries the failing line's 1-based `line` / `column`. |
+| `ContentLine.format` | `(line) => string` | Writes and folds a line, quoting parameter values that contain `:`, `;` or `,` and caret-encoding them. The value is written as given. |
+| `ContentLine.getParameter` | `(line, name) => Option<ReadonlyArray<string>>` | The first parameter's values, by case-insensitive name. |
+| `ContentLine.escapeText` / `unescapeText` | `(value) => string` | TEXT escaping (`\\`, `\;`, `\,`, `\n`); unescaping also reads `\N` and keeps unknown escapes. |
+| `ContentLine.splitValue` | `(value, ";" \| ",") => ReadonlyArray<string>` | Splits at unescaped separators only, for structured values such as vCard `N` and `ADR`. |
+| `ContentLine.fold` | `(line) => string` | Folds a formatted line at 75 octets (UTF-8) without splitting a code point. |
+
+```ts
+import { ContentLine } from "@thomasfosterau/effect-ical";
+import * as Result from "effect/Result";
+
+const line = Result.getOrThrow(
+  ContentLine.parse('ATTENDEE;CN="Doe, Jane";PARTSTAT=ACCEPTED:mailto:jane@example.com'),
+);
+line.parameters; // [{ name: "CN", values: ["Doe, Jane"] }, { name: "PARTSTAT", values: ["ACCEPTED"] }]
+line.value; // "mailto:jane@example.com"
+
+ContentLine.format(line); // 'ATTENDEE;CN="Doe, Jane";PARTSTAT=ACCEPTED:mailto:jane@example.com'
+```
+
+The root `parse` does not use `ContentLine.parse` yet: it still splits each line at its first `:` and drops parameters, as its golden corpus pins (keeping parameters is #22).
+
 ## Examples
 
 The repository's `examples/` directory has three runnable programs, one per API style; its test suite runs each of them.
 
 ## Standards
 
-Implements RFC 5545 content lines, components and escaping. Extensions from RFC 5546 (iTIP), RFC 6868 (parameter encoding), RFC 7529 (non-Gregorian recurrence) and RFC 7986 (new properties) are not implemented, though their properties pass through the parser as plain fields.
+Implements RFC 5545 content lines, components and escaping. `ContentLine` implements RFC 6868 parameter value encoding. Extensions from RFC 5546 (iTIP), RFC 7529 (non-Gregorian recurrence) and RFC 7986 (new properties) are not implemented, though their properties pass through the parser as plain fields.
 
 ## Changelog
 

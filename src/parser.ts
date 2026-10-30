@@ -11,9 +11,6 @@
  * @module
  */
 
-import * as Compiler from "@thomasfosterau/effect-parse/Compiler";
-import * as Parser from "@thomasfosterau/effect-parse/Parser";
-import * as Token from "@thomasfosterau/effect-parse/Token";
 import * as Arr from "effect/Array";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -23,6 +20,7 @@ import * as Record from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
+import * as ContentLine from "./ContentLine.js";
 import type * as Types from "./types.js";
 
 /**
@@ -47,13 +45,10 @@ export class ParseError extends Schema.TaggedError<ParseError, { readonly brand:
 ) {}
 
 /** A 1-based line and column in the input. */
-interface Position {
-  readonly line: number;
-  readonly column: number;
-}
+type Position = ContentLine.Position;
 
 /** One content line: `NAME[;PARAM=VALUE]*:VALUE`, with the name upper-cased. */
-interface ContentLine {
+interface NameValue {
   readonly name: string;
   readonly value: string;
 }
@@ -74,7 +69,7 @@ interface ParsedComponent {
 
 /** One step of the line scanner inside a component. */
 type Step = Data.TaggedEnum<{
-  Property: { readonly line: ContentLine };
+  Property: { readonly line: NameValue };
   Child: { readonly parsed: ParsedComponent };
   Close: { readonly index: number };
   Fail: { readonly error: ParseError };
@@ -83,80 +78,10 @@ type Step = Data.TaggedEnum<{
 const Step = Data.taggedEnum<Step>();
 
 /** One unfolded content line and the offset where it starts in the input. */
-interface Line {
-  readonly text: string;
-  readonly offset: number;
-}
-
-/** A line ending: `CRLF` or a bare `LF` (a lone `CR` is line content). */
-const eol = /*#__PURE__*/ Parser.alt(Token.literal("\r\n"), Token.literal("\n"));
-
-/** One or more line endings: empty lines are dropped. */
-const eols = /*#__PURE__*/ Parser.repeat(eol, { min: 1 });
-
-/**
- * A fold (RFC 5545 §3.1): line endings followed by a space or tab, removed
- * from the value. The empty lines it skips are dropped, so a continuation
- * joins the previous non-empty line.
- */
-const fold = /*#__PURE__*/ Parser.as(
-  /*#__PURE__*/ Parser.preceded(eols, /*#__PURE__*/ Token.oneOf(" \t")),
-  "",
-);
-
-/** A `CR` that does not start a `CRLF`: kept as content, as `\r?\n` splitting keeps it. */
-const loneCr = /*#__PURE__*/ Parser.terminated(
-  /*#__PURE__*/ Token.literal("\r"),
-  /*#__PURE__*/ Parser.not(/*#__PURE__*/ Token.literal("\n")),
-);
-
-/**
- * One unfolded content line. It starts at any character that is not a line
- * ending, a space or tab included: a continuation with nothing before it
- * stays a line of its own, whole.
- */
-const line = /*#__PURE__*/ Parser.struct({
-  offset: Parser.location,
-  text: /*#__PURE__*/ Parser.fold(
-    /*#__PURE__*/ Parser.alt(/*#__PURE__*/ Token.takeTill("\r\n", { min: 1 }), loneCr, fold),
-    { init: () => "", f: (text: string, chunk: string) => text + chunk, range: { min: 1 } },
-  ),
-});
-
-/**
- * The content-line scanner, compiled: every unfolded line of an input, in
- * order, with its offset. It accepts any string (every character is a line
- * ending or line content), so it never fails.
- */
-const lines = /*#__PURE__*/ Compiler.jit(
-  /*#__PURE__*/ Parser.delimited(
-    /*#__PURE__*/ Parser.repeat(eol),
-    /*#__PURE__*/ Parser.separated(line, eols),
-    /*#__PURE__*/ Parser.repeat(eol),
-  ),
-);
-
-/**
- * Unfold lines according to RFC 5545 §3.1: a line that starts with a space or
- * tab continues the previous non-empty line (minus that one whitespace
- * character). Empty lines are dropped; a continuation with nothing before it
- * stays a line of its own. Lines are split at `\r\n` or `\n`.
- */
-const unfoldLines = (text: string): ReadonlyArray<Line> =>
-  Result.getOrElse(Parser.parse(lines, text), () => []);
-
-/** The 1-based line and column of an offset, counting lines at each `\n`. */
-const positionOf = (text: string, offset: number): Position => {
-  const before = text.slice(0, offset);
-  const lineStart = before.lastIndexOf("\n") + 1;
-  return {
-    line: before.split("\n").length,
-    column: offset - lineStart + 1,
-  };
-};
+type Line = ContentLine.UnfoldedLine;
 
 /** Parse a content line into its upper-cased name and its value. */
-const parseContentLine = (line: string): Result.Result<ContentLine, ParseError> => {
+const parseContentLine = (line: string): Result.Result<NameValue, ParseError> => {
   const colonIndex = line.indexOf(":");
   return colonIndex === -1
     ? Result.fail(new ParseError({ message: `Invalid content line: ${line}` }))
@@ -207,7 +132,7 @@ const propertyValue = (name: string, value: string): string | number => {
  * Collect a component's property lines into fields: the last occurrence of a
  * single-valued property wins; repeatable ones collect into arrays in order.
  */
-const collectProperties = (lines: ReadonlyArray<ContentLine>): Record<string, PropertyValue> => {
+const collectProperties = (lines: ReadonlyArray<NameValue>): Record<string, PropertyValue> => {
   const [repeated, single] = Arr.partition(lines, (line) =>
     isArrayProperty(line.name) ? Result.succeed(line) : Result.fail(line),
   );
@@ -262,7 +187,7 @@ const childrenOf = (steps: ReadonlyArray<Step>): ReadonlyArray<ParsedComponent> 
   );
 
 /** The `Property` steps' lines, in order. */
-const propertiesOf = (steps: ReadonlyArray<Step>): ReadonlyArray<ContentLine> =>
+const propertiesOf = (steps: ReadonlyArray<Step>): ReadonlyArray<NameValue> =>
   Arr.filterMap(steps, (step) =>
     Step.$is("Property")(step) ? Result.succeed(step.line) : Result.failVoid,
   );
@@ -425,12 +350,14 @@ const toCalendar = ({ component: calendar, children }: ParsedComponent) => {
  * @category parsing
  */
 export const parseResult = (icalString: string): Result.Result<Types.VCalendar, ParseError> => {
-  const lines = unfoldLines(icalString);
+  const lines = ContentLine.unfold(icalString);
   return Option.match(Arr.findFirstIndex(lines, isCalendarBegin), {
     onNone: () => Result.fail(new ParseError({ message: "No VCALENDAR component found" })),
     onSome: (start) =>
       Result.flatMap(
-        parseComponent(lines, start, "VCALENDAR", (offset) => positionOf(icalString, offset)),
+        parseComponent(lines, start, "VCALENDAR", (offset) =>
+          ContentLine.positionOf(icalString, offset),
+        ),
         toCalendar,
       ),
   });
