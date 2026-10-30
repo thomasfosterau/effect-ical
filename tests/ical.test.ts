@@ -411,3 +411,82 @@ describe("numeric properties", () => {
     expect(priorityOf("99999999999999999999")).toBe("99999999999999999999");
   });
 });
+
+describe("TEXT round-trip (#23)", () => {
+  const roundTrip = (calendar: VCalendar): VCalendar => {
+    const result = parseResult(encodeSync(calendar));
+    assert(Result.isSuccess(result));
+    return result.success;
+  };
+
+  it("unescapes TEXT values the encoder escaped", () => {
+    const tricky = "Lunch; then 1:1, at C:\\Temp\nBring notes";
+    const calendar: VCalendar = {
+      component: "VCALENDAR",
+      version: "2.0",
+      prodid: "-//Test//EN",
+      name: tricky,
+      description: tricky,
+      timezones: [
+        {
+          component: "VTIMEZONE",
+          tzid: "X",
+          standard: [
+            {
+              dtstart: "19700101T000000",
+              tzoffsetfrom: "+0000",
+              tzoffsetto: "+0000",
+              tzname: tricky,
+            },
+          ],
+        },
+      ],
+      events: [
+        {
+          component: "VEVENT",
+          dtstart: "20240101T120000Z",
+          summary: tricky,
+          description: tricky,
+          location: tricky,
+          categories: ["Work, mostly", "Back\\slash", "Plain"],
+        },
+      ],
+    };
+    const parsed = roundTrip(calendar);
+    expect(parsed.name).toBe(tricky);
+    expect(parsed.description).toBe(tricky);
+    expect(parsed.timezones?.[0]?.standard?.[0]?.tzname).toBe(tricky);
+    expect(parsed.events?.[0]).toMatchObject({
+      summary: tricky,
+      description: tricky,
+      location: tricky,
+      categories: ["Work, mostly", "Back\\slash", "Plain"],
+    });
+  });
+
+  it("is stable: encode ∘ parse ∘ encode equals encode", () => {
+    const calendar: VCalendar = {
+      component: "VCALENDAR",
+      version: "2.0",
+      prodid: "-//Test//EN",
+      events: [
+        {
+          component: "VEVENT",
+          dtstart: "20240101T120000Z",
+          summary: "a\\b;c,d\ne",
+          categories: ["x,y", "z"],
+        },
+      ],
+    };
+    const once = encodeSync(calendar);
+    expect(encodeSync(roundTrip(calendar))).toBe(once);
+  });
+
+  it("reads \\N as a newline and keeps unknown escapes", () => {
+    const result = parseResult(
+      "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:x\nBEGIN:VEVENT\nDTSTART:1\nSUMMARY:a\\Nb\\tc\nEND:VEVENT\nEND:VCALENDAR\n",
+    );
+    assert(Result.isSuccess(result));
+    expect(result.success.events?.[0]?.summary).toBe("a\nb\\tc");
+  });
+});

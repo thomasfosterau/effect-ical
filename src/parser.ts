@@ -6,7 +6,10 @@
  * `Effect` wrapper (`parse`) for use inside Effect programs. Content lines are
  * unfolded (RFC 5545 §3.1), property names are lower-cased into field names,
  * and `ATTENDEE`, `CATEGORIES`, `RDATE` and `EXDATE` collect into arrays.
- * Values are kept verbatim: text is not unescaped and dates are not decoded.
+ * TEXT values (`SUMMARY`, `DESCRIPTION`, `LOCATION`, `COMMENT`, `CONTACT`,
+ * `NAME`, `TZNAME`, `X-WR-CALNAME`, `X-WR-CALDESC`) are unescaped, and each
+ * `CATEGORIES` line splits at its unescaped commas. Other values are kept
+ * verbatim: dates, durations and recurrence rules are not decoded.
  *
  * @module
  */
@@ -131,8 +134,26 @@ const isOneOf =
   (name: string): boolean =>
     Arr.contains(names, name);
 
+/** TEXT properties (RFC 5545 §3.3.11) whose value is unescaped. */
+const textProperties = [
+  "SUMMARY",
+  "DESCRIPTION",
+  "LOCATION",
+  "COMMENT",
+  "CONTACT",
+  "NAME",
+  "TZNAME",
+  "X-WR-CALNAME",
+  "X-WR-CALDESC",
+] as const;
+
+/** TEXT-list properties: split at unescaped commas, then each item unescaped. */
+const textListProperties = ["CATEGORIES"] as const;
+
 const isNumericProperty = isOneOf(numericProperties);
 const isArrayProperty = isOneOf(arrayProperties);
+const isTextProperty = isOneOf(textProperties);
+const isTextListProperty = isOneOf(textListProperties);
 
 const fieldName = (name: string): string =>
   Option.getOrElse(Record.get(propertyNameMap, name), () => name.toLowerCase());
@@ -151,9 +172,11 @@ const leadingInteger = /*#__PURE__*/ Compiler.jit(
 );
 
 const propertyValue = (name: string, value: string): string | number =>
-  isNumericProperty(name)
-    ? Result.getOrElse(Parser.parse(leadingInteger, value), (): string | number => value)
-    : value;
+  isTextProperty(name)
+    ? ContentLine.unescapeText(value)
+    : isNumericProperty(name)
+      ? Result.getOrElse(Parser.parse(leadingInteger, value), (): string | number => value)
+      : value;
 
 /**
  * Collect a component's property lines into fields: the last occurrence of a
@@ -170,7 +193,11 @@ const collectProperties = (lines: ReadonlyArray<NameValue>): Record<string, Prop
   return {
     ...singles,
     ...Record.map(groups, (group) =>
-      Arr.map(group, ({ name, value }) => propertyValue(name, value)),
+      Arr.flatMap(group, ({ name, value }) =>
+        isTextListProperty(name)
+          ? Arr.map(ContentLine.splitValue(value, ","), ContentLine.unescapeText)
+          : [propertyValue(name, value)],
+      ),
     ),
   };
 };

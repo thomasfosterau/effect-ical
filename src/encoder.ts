@@ -4,8 +4,8 @@
  *
  * Output uses CRLF line endings and folds every content line longer than 75
  * octets (UTF-8) onto continuation lines. Text-valued properties (`SUMMARY`,
- * `DESCRIPTION`, `LOCATION`, `NAME`) are escaped; every other value is written
- * verbatim. Optional string properties that are empty are omitted.
+ * `DESCRIPTION`, `LOCATION`, `NAME`, `TZNAME` and each `CATEGORIES` item) are
+ * escaped; every other value is written verbatim. Optional string properties that are empty are omitted.
  *
  * @module
  */
@@ -96,7 +96,14 @@ const encodeEvent = (event: Types.VEvent): ReadonlyArray<string> =>
     optionalText("LOCATION", event.location),
     optional("ORGANIZER", event.organizer),
     each("ATTENDEE", event.attendee),
-    event.categories ? [formatContentLine("CATEGORIES", Arr.join(event.categories, ","))] : [],
+    event.categories
+      ? [
+          formatContentLine(
+            "CATEGORIES",
+            Arr.join(Arr.map(event.categories, ContentLine.escapeText), ","),
+          ),
+        ]
+      : [],
     optional("STATUS", event.status),
     optional("RRULE", event.rrule),
     each("RDATE", event.rdate),
@@ -170,7 +177,7 @@ const encodeObservance =
         formatContentLine("TZOFFSETTO", observance.tzoffsetto),
       ],
       optional("RRULE", observance.rrule),
-      optional("TZNAME", observance.tzname),
+      optionalText("TZNAME", observance.tzname),
     ]);
 
 const encodeTimezone = (timezone: Types.VTimezone): ReadonlyArray<string> =>
