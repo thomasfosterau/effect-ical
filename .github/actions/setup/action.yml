@@ -20,7 +20,12 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
-        node-version: latest
+        # Never `latest`: setup-node resolves it to the newest nodejs.org
+        # index entry, pre-releases included (v27.0.0-alpha since 2026-10-29,
+        # which hangs some test suites). `*` + `check-latest` takes the
+        # newest stable release from setup-node's manifest instead.
+        node-version: "*"
+        check-latest: true
         cache: pnpm
 
     # Retried: pnpm's linker can race itself when a package with a build

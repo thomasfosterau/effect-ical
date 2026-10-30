@@ -123,7 +123,10 @@ export default defineConfig({
     // Type-aware rules run (tsgolint, patched by @effect/tsgo, so the
     // `effecttsgo/*` diagnostics report here too); full type checking stays
     // the `check` task's job (native tsc, Effect-patched), so `typeCheck` is
-    // off and `vp check` does not type-check twice.
+    // off and `vp check` does not type-check twice. Measured 2026-10-30 with
+    // tsgolint 7.0.2004: `typeCheck: true` reported the same TS errors over
+    // the same files (`src`, `tests`, `examples`) that `vp run check` already
+    // fails on, and nothing that gate misses.
     options: {
       typeAware: true,
       typeCheck: false,

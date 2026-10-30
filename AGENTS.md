@@ -28,7 +28,7 @@
 - **Strict catalog.** Every external version lives in `pnpm-workspace.yaml` (`catalogMode: strict`); `package.json` carries only `catalog:` and `catalog:peers`. After editing the catalog, run `pnpm install` and commit `pnpm-lock.yaml`, or CI fails at `pnpm install --frozen-lockfile`.
 - **`minimumReleaseAge`** holds a newly published version for 8 hours (480 minutes) before `pnpm install` takes it; Dependabot's `cooldown` is 1 day (it takes whole days only), so it never proposes a version pnpm would still refuse. `@thomasfosterau/*` is exempt from both.
 - **Dependabot groups every lockstep set** (`.github/dependabot.yml`: `toolchain`, `effect`, `changesets`, `fallow`, `github-actions`). By hand, on the toolchain PR's branch: the npm-alias catalog entries (`vite` → `@voidzero-dev/vite-plus-core`, equal to `vite-plus`; `typescript` → `@typescript/typescript6`; `@typescript/native` → `typescript`, matching `@effect/tsgo`'s `components` table) and an `@effect/tsgo` release that supports the new oxlint / tsgolint.
-- **Node and pnpm only.** No npm, npx, bun or yarn in scripts, hooks, workflows or docs.
+- **Node and pnpm only.** No npm, npx, bun or yarn in scripts, hooks, workflows or docs. CI and Release set up Node as `node-version: "*"` with `check-latest: true`, never `latest` (which resolves to nodejs.org's newest entry, pre-releases included).
 
 ## Conventions
 
@@ -44,7 +44,7 @@
 ## Commands
 
 - `pnpm install`: dependencies (pnpm 11, pinned by `packageManager`), the Vite+ git hooks (`vp config`; pre-commit runs `vp staged`: format + lint on staged files) and the `prepare` step that patches the native `tsc` and `oxlint` with `@effect/tsgo`. No pre-push hook: run the gates yourself.
-- `vp check`: format + lint. `vp check --fix` applies fixes. `vp run check`: the type gate (native TS7 `tsc` over `tsconfig.json`, then `tsconfig.test.json`, which adds `tests` and `examples`). They are different commands.
+- `vp check`: format + lint; lint is type-aware through `oxlint-tsgolint` (bundled with Vite+, patched by `@effect/tsgo`), with `typeCheck` off because `vp run check` is the type gate. `vp check --fix` applies fixes. `vp run check`: the type gate (native TS7 `tsc` over `tsconfig.json`, then `tsconfig.test.json`, which adds `tests` and `examples`). They are different commands.
 - `vp run test:unit`: the unit suite.
 - `vp run test:coverage`: the suite under Istanbul, failing below the thresholds; writes `coverage/coverage-final.json`, which `fallow audit` reads.
 - `vp run build`: `vp pack` → `dist/`.

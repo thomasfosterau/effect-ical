@@ -38,7 +38,7 @@ export class Event extends Schema.Class<Event, { readonly brand: unique symbol }
   rdate: Schema.optional(Schema.Array(Schema.String)),
   exdate: Schema.optional(Schema.Array(Schema.String)),
   url: Schema.optional(Schema.String),
-  priority: Schema.optional(Schema.Number),
+  priority: Schema.optional(Schema.Finite),
   class: Schema.optional(Schema.Literals(["PUBLIC", "PRIVATE", "CONFIDENTIAL"])),
 }) {}
 

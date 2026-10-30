@@ -32,9 +32,9 @@ export class Todo extends Schema.Class<Todo, { readonly brand: unique symbol }>(
   status: Schema.optional(
     Schema.Literals(["NEEDS-ACTION", "COMPLETED", "IN-PROCESS", "CANCELLED"]),
   ),
-  percent: Schema.optional(Schema.Number),
+  percent: Schema.optional(Schema.Finite),
   completed: Schema.optional(Schema.String),
-  priority: Schema.optional(Schema.Number),
+  priority: Schema.optional(Schema.Finite),
   rrule: Schema.optional(Schema.String),
 }) {}
 
