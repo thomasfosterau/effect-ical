@@ -11,6 +11,7 @@
 `src/` modules and their boundaries:
 
 - `types.ts`: the plain object model (`VCalendar`, `VEvent`, `VTodo`, `VJournal`, `VFreeBusy`, `VTimezone`, `VAlarm`). Types only.
+- `ContentLine.ts`: the content-line syntax iCalendar shares with vCard (`unfold`, `parse` / `parseAll`, `format` / `fold`, parameters with RFC 6868 encoding, TEXT escaping and splitting), exported as a namespace. Pure; no component knowledge.
 - `parser.ts`: text → `VCalendar` (`parseResult`, `parse`, `ParseError`). Pure; values are kept verbatim (no unescaping, no date decoding).
 - `encoder.ts`: `VCalendar` → text (`encodeResult`, `encode`, `encodeSync`, `EncodeError`). Pure; escapes TEXT values, folds at 75 octets, CRLF.
 - `builder.ts`: mutable fluent builders over the object model (`createCalendar`, `createEvent`, `createTodo`, `BuildError`).
