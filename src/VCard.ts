@@ -19,6 +19,10 @@
 // The barrel re-exports this module only as a namespace (`export * as VCard`),
 // so its `parse` and `encode` names never collide with a sibling module's.
 // fallow-ignore-file duplicate-export
+import * as Ascii from "@thomasfosterau/effect-parse/Ascii";
+import * as Compiler from "@thomasfosterau/effect-parse/Compiler";
+import * as Parser from "@thomasfosterau/effect-parse/Parser";
+import * as Token from "@thomasfosterau/effect-parse/Token";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
@@ -192,6 +196,18 @@ const parametersOf = (property: Property<unknown>): ReadonlyArray<ContentLine.Pa
 const entry = <K extends string, V>(key: K, value: Option.Option<V>): { readonly [P in K]?: V } =>
   Option.match(value, { onNone: () => ({}), onSome: (v) => Record.singleton(key, v) });
 
+/** A comma-separated list of parameter text (one quoted `TYPE` value). */
+const commaList = /*#__PURE__*/ Compiler.jit(
+  /*#__PURE__*/ Parser.separated(
+    /*#__PURE__*/ Token.takeTill(","),
+    /*#__PURE__*/ Token.literal(","),
+    { min: 1 },
+  ),
+);
+
+/** A `PREF` value: an unsigned integer (RFC 6350 §5.3 allows 1 to 100). */
+const preference = /*#__PURE__*/ Compiler.jit(/*#__PURE__*/ Parser.allConsuming(Ascii.decUint));
+
 /**
  * The `TYPE` values of a property, lower-cased, with comma lists inside one
  * quoted value (`TYPE="work,voice"`) split.
@@ -202,12 +218,18 @@ export const types = (property: Property<unknown>): ReadonlyArray<string> =>
   Arr.flatMap(
     Arr.filter(parametersOf(property), (parameter) => parameter.name === "TYPE"),
     (parameter: ContentLine.Parameter) =>
-      Arr.flatMap(parameter.values, (value: string) => Arr.map(value.split(","), Str.toLowerCase)),
+      Arr.flatMap(parameter.values, (value: string) =>
+        Arr.map(
+          Result.getOrElse(Parser.parse(commaList, value), () => [value]),
+          Str.toLowerCase,
+        ),
+      ),
   );
 
 /**
  * The property with the lowest `PREF` (1 is most preferred); properties
- * without `PREF` rank last, and ties keep their order.
+ * without a `PREF` that is an unsigned integer rank last, and ties keep
+ * their order.
  *
  * @category accessors
  */
@@ -220,7 +242,7 @@ export const preferred = <A>(properties: ReadonlyArray<Property<A>>): Option.Opt
           Option.flatMap(
             Arr.findFirst(parametersOf(property), (parameter) => parameter.name === "PREF"),
             (parameter) => Option.fromNullishOr(parameter.values[0]),
-          ).pipe(Option.map(Number), Option.filter(Number.isFinite)),
+          ).pipe(Option.flatMap((value) => Result.getSuccess(Parser.parse(preference, value)))),
           () => 101,
         ),
       Order.Number,
