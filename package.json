@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.schemastore.org/package",
   "name": "@thomasfosterau/effect-ical",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "iCalendar (RFC 5545) and vCard (RFC 6350) encoding and decoding for Effect: typed components, parsers, encoders and pipeable builders.",
   "keywords": [
     "calendar",
