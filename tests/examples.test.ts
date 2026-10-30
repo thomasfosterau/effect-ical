@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import { main as basic } from "../examples/basic.ts";
 import { main as builder } from "../examples/builder.ts";
 import { main as effectApi } from "../examples/effect-api.ts";
+import { main as vcard } from "../examples/vcard.ts";
 import { runTest } from "./helpers/effect.ts";
 
 describe("examples", () => {
@@ -30,5 +31,12 @@ describe("examples", () => {
   it("effect-api encodes a calendar and handles a parse failure", async () => {
     await runTest(effectApi());
     expect(log).toHaveBeenCalledWith("Could not parse: PRODID property is required");
+  });
+
+  it("vcard parses, reads and encodes contacts", async () => {
+    await runTest(vcard());
+    expect(log).toHaveBeenCalledWith("Organisation: Example, Inc. / Engineering");
+    expect(log).toHaveBeenCalledWith("Preferred email: jane@work.example (work)");
+    expect(log).toHaveBeenCalledWith("Kept as extra: X-ABLABEL");
   });
 });

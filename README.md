@@ -1,6 +1,6 @@
 # @thomasfosterau/effect-ical
 
-iCalendar ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)) encoding and decoding for [Effect](https://effect.website): a typed object model for `VCALENDAR` data, a parser and an encoder (as pure `Result` functions and as Effects), fluent builders, and pipeable `Calendar` / `Event` / `Todo` modules.
+iCalendar ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)) and vCard ([RFC 6350](https://datatracker.ietf.org/doc/html/rfc6350)) encoding and decoding for [Effect](https://effect.website): a typed object model for `VCALENDAR` data, a parser and an encoder (as pure `Result` functions and as Effects), fluent builders, pipeable `Calendar` / `Event` / `Todo` modules, a vCard 4.0 codec, and the content-line layer the two formats share.
 
 - Components: `VEVENT`, `VTODO`, `VJOURNAL`, `VFREEBUSY`, `VTIMEZONE` (with `STANDARD` / `DAYLIGHT`) and `VALARM`.
 - The encoder escapes TEXT values, folds lines at 75 octets (UTF-8, never splitting a character) and writes CRLF line endings; the parser unfolds lines and collects repeatable properties (`ATTENDEE`, `CATEGORIES`, `RDATE`, `EXDATE`) into arrays.
@@ -215,9 +215,49 @@ ContentLine.format(line); // 'ATTENDEE;CN="Doe, Jane";PARTSTAT=ACCEPTED:mailto:j
 
 The root `parse` does not use `ContentLine.parse` yet: it still splits each line at its first `:` and drops parameters, as its golden corpus pins (keeping parameters is #22).
 
+### vCard 4.0: `VCard`
+
+`VCard` reads and writes vCard 4.0 ([RFC 6350](https://datatracker.ietf.org/doc/html/rfc6350)) contact cards on the same content-line layer. A `.vcf` input may hold any number of cards.
+
+| Export | Signature | Notes |
+| --- | --- | --- |
+| `VCard.parse` | `(text) => Effect<ReadonlyArray<VCard>, VCardParseError>` | Runs when the Effect runs. |
+| `VCard.parseResult` | `(text) => Result<ReadonlyArray<VCard>, VCardParseError>` | Synchronous. Lines outside cards are ignored. Fails on a malformed line inside a card (with `line` / `column`), an unclosed or nested card, and a card without `VERSION:4.0` or `FN`. |
+| `VCard.encode` / `encodeResult` | `(card \| cards) => Effect<string, VCardEncodeError>` / `Result<…>` | Writes `BEGIN`, `VERSION:4.0`, the typed properties in a fixed order, then `extra` in its order; folds at 75 octets; CRLF. |
+| `VCard.make` | `(fn) => VCard` | A minimal card. |
+| `VCard.types` | `(property) => ReadonlyArray<string>` | The `TYPE` values, lower-cased, with `TYPE="work,voice"` split. |
+| `VCard.preferred` | `(properties) => Option<Property>` | The property with the lowest `PREF`. |
+
+Every property instance is a `Property<A>`: `{ value, parameters?, group? }`. Fields are named after their properties (`fn`, `n`, `email`, `tel`, `adr`, `org`, …); `fn` is a non-empty list, the at-most-once properties (`n`, `bday`, `anniversary`, `gender`, `prodid`, `rev`, `uid`, `kind`) are single, and the rest are lists.
+
+- TEXT values (`FN`, `NOTE`, `EMAIL`, `TITLE`, `ROLE`, …) are unescaped, unless the property says `VALUE=uri`; `NICKNAME` and `CATEGORIES` are comma lists.
+- `N` (5 components), `ADR` (7) and `GENDER` (sex; identity) are structured, each `N` / `ADR` component a list; `ORG` is the organisation name then its units.
+- URIs, dates and other values (`TEL`, `URL`, `PHOTO`, `BDAY`, `TZ`, `UID`, …) are verbatim strings.
+- Nothing is lost: properties the model does not type (`X-…`, `item1.X-ABLabel`), a second `UID`, and an `N` or `ADR` with too many components are kept in `extra` in their order and written back.
+
+vCard 3.0 and 2.1 are not read yet ([#27](https://github.com/thomasfosterau/effect-ical/issues/27)).
+
+```ts
+import { VCard } from "@thomasfosterau/effect-ical";
+import * as Option from "effect/Option";
+import * as Result from "effect/Result";
+
+const [jane] = Result.getOrThrow(
+  VCard.parseResult(
+    "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane Doe\r\nN:Doe;Jane;;;\r\n" +
+      "EMAIL;TYPE=work;PREF=1:jane@work.example\r\nEND:VCARD\r\n",
+  ),
+);
+jane?.n?.value.givenNames; // ["Jane"]
+Option.map(VCard.preferred(jane?.email ?? []), (email) => email.value); // Some("jane@work.example")
+
+const text = Result.getOrThrow(VCard.encodeResult(VCard.make("John Doe")));
+// "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:John Doe\r\nEND:VCARD\r\n"
+```
+
 ## Examples
 
-The repository's `examples/` directory has three runnable programs, one per API style; its test suite runs each of them.
+The repository's `examples/` directory has four runnable programs, one per API style plus one for vCard; its test suite runs each of them.
 
 ## Standards
 

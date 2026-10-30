@@ -11,6 +11,7 @@ export * as Calendar from "./Calendar.js";
 export * as ContentLine from "./ContentLine.js";
 export * as Event from "./Event.js";
 export * as Todo from "./Todo.js";
+export * as VCard from "./VCard.js";
 
 // The plain object model, its parser and encoder, and the fluent builders.
 export * from "./parser.js";
