@@ -388,3 +388,26 @@ describe("Round-trip encoding and parsing", () => {
     expect(parsed.todos?.length).toBe(1);
   });
 });
+
+describe("numeric properties", () => {
+  const priorityOf = (value: string) => {
+    const result = parseResult(
+      `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:x\nBEGIN:VEVENT\nDTSTART:1\nPRIORITY:${value}\nEND:VEVENT\nEND:VCALENDAR\n`,
+    );
+    assert(Result.isSuccess(result));
+    return result.success.events?.[0]?.priority;
+  };
+
+  it("reads a leading integer, as parseInt did", () => {
+    expect(priorityOf("5")).toBe(5);
+    expect(priorityOf(" +7")).toBe(7);
+    expect(priorityOf("-3")).toBe(-3);
+    expect(priorityOf("12abc")).toBe(12);
+  });
+
+  it("keeps text that does not start with a safe integer", () => {
+    expect(priorityOf("high")).toBe("high");
+    expect(priorityOf("")).toBe("");
+    expect(priorityOf("99999999999999999999")).toBe("99999999999999999999");
+  });
+});

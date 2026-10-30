@@ -11,6 +11,10 @@
  * @module
  */
 
+import * as Ascii from "@thomasfosterau/effect-parse/Ascii";
+import * as Compiler from "@thomasfosterau/effect-parse/Compiler";
+import * as Parser from "@thomasfosterau/effect-parse/Parser";
+import * as Token from "@thomasfosterau/effect-parse/Token";
 import * as Arr from "effect/Array";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -80,16 +84,29 @@ const Step = Data.taggedEnum<Step>();
 /** One unfolded content line and the offset where it starts in the input. */
 type Line = ContentLine.UnfoldedLine;
 
+/**
+ * A content line as this parser has always read it: the name is the text
+ * before the first `;` or `:`, the parameters (everything up to the first
+ * `:`, quoted or not) are skipped, and the value is the rest. Unlike
+ * `ContentLine.parse`, a quoted `:` in a parameter ends the parameters, as
+ * the golden corpus pins (keeping parameters is #22).
+ */
+const nameAndValue = /*#__PURE__*/ Compiler.jit(
+  /*#__PURE__*/ Parser.struct({
+    name: /*#__PURE__*/ Parser.terminated(
+      /*#__PURE__*/ Token.takeTill(";:"),
+      /*#__PURE__*/ Token.takeTill(":"),
+    ),
+    value: /*#__PURE__*/ Parser.preceded(/*#__PURE__*/ Token.literal(":"), Token.rest),
+  }),
+);
+
 /** Parse a content line into its upper-cased name and its value. */
-const parseContentLine = (line: string): Result.Result<NameValue, ParseError> => {
-  const colonIndex = line.indexOf(":");
-  return colonIndex === -1
-    ? Result.fail(new ParseError({ message: `Invalid content line: ${line}` }))
-    : Result.succeed({
-        name: Str.toUpperCase(line.slice(0, colonIndex).split(";")[0] ?? ""),
-        value: line.slice(colonIndex + 1),
-      });
-};
+const parseContentLine = (line: string): Result.Result<NameValue, ParseError> =>
+  Result.mapBoth(Parser.parse(nameAndValue, line), {
+    onFailure: () => new ParseError({ message: `Invalid content line: ${line}` }),
+    onSuccess: ({ name, value }) => ({ name: Str.toUpperCase(name), value }),
+  });
 
 /** RFC property names whose field name is not simply the lower-cased name. */
 const propertyNameMap: Readonly<Record<string, string>> = {
@@ -120,13 +137,23 @@ const isArrayProperty = isOneOf(arrayProperties);
 const fieldName = (name: string): string =>
   Option.getOrElse(Record.get(propertyNameMap, name), () => name.toLowerCase());
 
-const propertyValue = (name: string, value: string): string | number => {
-  if (!isNumericProperty(name)) {
-    return value;
-  }
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? value : parsed;
-};
+/**
+ * The integer a numeric property's value starts with, read as
+ * `Number.parseInt` always read it: leading whitespace skipped, an optional
+ * sign, digits, and anything after them ignored.
+ */
+const leadingInteger = /*#__PURE__*/ Compiler.jit(
+  /*#__PURE__*/ Parser.delimited(
+    /*#__PURE__*/ Token.takeWhile((char: string) => char.trim() === ""),
+    Ascii.decInt,
+    Token.rest,
+  ),
+);
+
+const propertyValue = (name: string, value: string): string | number =>
+  isNumericProperty(name)
+    ? Result.getOrElse(Parser.parse(leadingInteger, value), (): string | number => value)
+    : value;
 
 /**
  * Collect a component's property lines into fields: the last occurrence of a

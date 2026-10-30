@@ -180,7 +180,34 @@ export const positionOf = (text: string, offset: number): Position => {
 // Parameter values (RFC 6868)
 // ---------------------------------------------------------------------------
 
-const caretDecodings: Readonly<Record<string, string>> = { n: "\n", N: "\n", "'": '"', "^": "^" };
+/** The strings `piece` yields, concatenated: zero or more times, or at least `min`. */
+const concat = (piece: Parser.Parser<string>, min = 0): Parser.Parser<string> =>
+  Parser.fold(piece, {
+    init: () => "",
+    f: (text: string, chunk: string) => text + chunk,
+    range: { min },
+  });
+
+/** An RFC 6868 escape: `^n` / `^N` (a newline), `^'` (a double quote) or `^^`. */
+const caretEscape = /*#__PURE__*/ Parser.preceded(
+  /*#__PURE__*/ Token.literal("^"),
+  /*#__PURE__*/ Parser.alt(
+    /*#__PURE__*/ Parser.as(/*#__PURE__*/ Token.oneOf("nN"), "\n"),
+    /*#__PURE__*/ Parser.as(/*#__PURE__*/ Token.literal("'"), '"'),
+    /*#__PURE__*/ Token.literal("^"),
+  ),
+);
+
+/**
+ * Parameter text up to (not including) any of `stop`, caret-decoded. A `^`
+ * that starts no escape is kept.
+ */
+const caretText = (stop: string): Parser.Parser<string> =>
+  concat(Parser.alt(Token.takeTill(`^${stop}`, { min: 1 }), caretEscape, Token.literal("^")));
+
+const caretDecoded = /*#__PURE__*/ Compiler.jit(
+  /*#__PURE__*/ Parser.allConsuming(/*#__PURE__*/ caretText("")),
+);
 
 /**
  * Decode RFC 6868 caret escapes in a parameter value: `^n` is a newline,
@@ -189,7 +216,7 @@ const caretDecodings: Readonly<Record<string, string>> = { n: "\n", N: "\n", "'"
  * @category parameters
  */
 export const decodeParameterValue = (value: string): string =>
-  value.replace(/\^([nN'^])/g, (_, char: string) => caretDecodings[char] ?? char);
+  Result.getOrElse(Parser.parse(caretDecoded, value), () => value);
 
 /**
  * Encode a parameter value for writing: RFC 6868 caret escapes for `^`,
@@ -207,16 +234,15 @@ export const encodeParameterValue = (value: string): string => {
 // Parsing one line
 // ---------------------------------------------------------------------------
 
+/** A quoted parameter value: anything but a double quote, caret-decoded. */
 const quotedValue = /*#__PURE__*/ Parser.delimited(
   /*#__PURE__*/ Token.literal('"'),
-  /*#__PURE__*/ Token.takeTill('"'),
+  /*#__PURE__*/ caretText('"'),
   /*#__PURE__*/ Parser.context(/*#__PURE__*/ Token.literal('"'), "a closing double quote"),
 );
 
-const parameterValue = /*#__PURE__*/ Parser.map(
-  /*#__PURE__*/ Parser.alt(quotedValue, /*#__PURE__*/ Token.takeTill('";:,')),
-  decodeParameterValue,
-);
+/** A parameter value, quoted or not (`paramtext` stops at `"`, `;`, `:` and `,`). */
+const parameterValue = /*#__PURE__*/ Parser.alt(quotedValue, /*#__PURE__*/ caretText('";:,'));
 
 const parameter = /*#__PURE__*/ Parser.map(
   /*#__PURE__*/ Parser.seq(
@@ -457,6 +483,28 @@ export const format = (line: ContentLine): string =>
 export const escapeText = (value: string): string =>
   value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 
+/** A TEXT escape: `\n` / `\N` (a newline), or a backslash, `;` or `,` escaped. */
+const textEscape = /*#__PURE__*/ Parser.preceded(
+  /*#__PURE__*/ Token.literal("\\"),
+  /*#__PURE__*/ Parser.alt(
+    /*#__PURE__*/ Parser.as(/*#__PURE__*/ Token.oneOf("nN"), "\n"),
+    /*#__PURE__*/ Token.oneOf("\\;,"),
+  ),
+);
+
+/** A TEXT value, unescaped; a backslash that starts no escape is kept. */
+const unescapedText = /*#__PURE__*/ Compiler.jit(
+  /*#__PURE__*/ Parser.allConsuming(
+    /*#__PURE__*/ concat(
+      /*#__PURE__*/ Parser.alt(
+        /*#__PURE__*/ Token.takeTill("\\", { min: 1 }),
+        textEscape,
+        /*#__PURE__*/ Token.literal("\\"),
+      ),
+    ),
+  ),
+);
+
 /**
  * Unescape a TEXT value: `\\`, `\;`, `\,` and `\n` / `\N` (a newline) are
  * decoded. Any other backslash sequence is kept verbatim, as lenient
@@ -465,11 +513,32 @@ export const escapeText = (value: string): string =>
  * @category text
  */
 export const unescapeText = (value: string): string =>
-  value.replace(/\\([\\;,nN])/g, (_, char: string) => (char === "n" || char === "N" ? "\n" : char));
+  Result.getOrElse(Parser.parse(unescapedText, value), () => value);
 
-/** A separator preceded by an even number of backslashes (so not itself escaped). */
-const unescapedSemicolon = /(?<=(?:^|[^\\])(?:\\\\)*);/;
-const unescapedComma = /(?<=(?:^|[^\\])(?:\\\\)*),/;
+/** A backslash and the character after it, kept as written. */
+const escapePair = /*#__PURE__*/ Parser.map(
+  /*#__PURE__*/ Parser.preceded(/*#__PURE__*/ Token.literal("\\"), Token.any),
+  (char) => `\\${char}`,
+);
+
+/** The parts of a value between unescaped `separator`s, escapes kept. */
+const splitter = (separator: "," | ";") =>
+  Compiler.jit(
+    Parser.allConsuming(
+      Parser.separated(
+        concat(
+          Parser.alt(Token.takeTill(`\\${separator}`, { min: 1 }), escapePair, Token.literal("\\")),
+        ),
+        Token.literal(separator),
+        { min: 1 },
+      ),
+    ),
+  );
+
+const splitters = {
+  ",": /*#__PURE__*/ splitter(","),
+  ";": /*#__PURE__*/ splitter(";"),
+};
 
 /**
  * Split a value at each `separator` that is not escaped with a backslash,
@@ -486,4 +555,4 @@ const unescapedComma = /(?<=(?:^|[^\\])(?:\\\\)*),/;
  * @category text
  */
 export const splitValue = (value: string, separator: "," | ";"): ReadonlyArray<string> =>
-  value.split(separator === ";" ? unescapedSemicolon : unescapedComma);
+  Result.getOrElse(Parser.parse(splitters[separator], value), () => [value]);
