@@ -102,3 +102,40 @@ export const isTypedProperty =
       onNone: () => false,
       onSome: (names) => Arr.contains(names, name),
     });
+
+/**
+ * The sub-components each component type holds in a field, as `[field,
+ * component type]` pairs, by parent component name. Any other child is
+ * unknown there and kept verbatim. The `VCALENDAR`'s own lists
+ * (`timezones`, `events`, …) are sorted out by the parser's `toCalendar`.
+ */
+const knownComponents: R.ReadonlyRecord<
+  string,
+  ReadonlyArray<readonly [field: string, componentType: string]>
+> = {
+  VCALENDAR: [
+    ["timezones", "VTIMEZONE"],
+    ["events", "VEVENT"],
+    ["todos", "VTODO"],
+    ["journals", "VJOURNAL"],
+    ["freebusys", "VFREEBUSY"],
+  ],
+  VEVENT: [["alarms", "VALARM"]],
+  VTODO: [["alarms", "VALARM"]],
+  VTIMEZONE: [
+    ["standard", "STANDARD"],
+    ["daylight", "DAYLIGHT"],
+  ],
+};
+
+/** The `[field, component type]` pairs a component type holds sub-components in. */
+export const subComponents = (
+  componentType: string,
+): ReadonlyArray<readonly [field: string, componentType: string]> =>
+  Option.getOrElse(R.get(knownComponents, componentType), () => []);
+
+/** Whether a component of type `componentType` holds `childType` children in a field. */
+export const isKnownChild =
+  (componentType: string) =>
+  (childType: string): boolean =>
+    Arr.some(subComponents(componentType), ([, type]) => type === childType);

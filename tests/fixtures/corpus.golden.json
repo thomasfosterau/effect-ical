@@ -126,7 +126,19 @@
                 ],
                 []
               ]
-            }
+            },
+            "extra": [
+              {
+                "name": "SEQUENCE",
+                "parameters": [],
+                "value": "2"
+              },
+              {
+                "name": "GEO",
+                "parameters": [],
+                "value": "37.386013;-122.082932"
+              }
+            ]
           }
         ],
         "todos": [
@@ -157,7 +169,38 @@
             "dtstart": "20240101T000000Z",
             "dtend": "20240102T000000Z",
             "freebusy": "20240101T090000Z/20240101T100000Z",
-            "component": "VFREEBUSY"
+            "component": "VFREEBUSY",
+            "extra": [
+              {
+                "name": "FREEBUSY",
+                "parameters": [
+                  {
+                    "name": "FBTYPE",
+                    "values": ["BUSY"]
+                  }
+                ],
+                "value": "20240101T090000Z/20240101T100000Z"
+              }
+            ]
+          }
+        ],
+        "extra": [
+          {
+            "name": "X-WR-CALNAME",
+            "parameters": [],
+            "value": "Custom"
+          }
+        ],
+        "components": [
+          {
+            "component": "X-CUSTOM",
+            "properties": [
+              {
+                "name": "FOO",
+                "parameters": [],
+                "value": "bar"
+              }
+            ]
           }
         ]
       }
@@ -235,7 +278,19 @@
       "ok": {
         "component": "VCALENDAR",
         "prodid": "-//Test//EN",
-        "version": "2.0"
+        "version": "2.0",
+        "extra": [
+          {
+            "name": "SUMMARY",
+            "parameters": [],
+            "value": "leaks"
+          },
+          {
+            "name": "DTSTART",
+            "parameters": [],
+            "value": "20240101"
+          }
+        ]
       }
     },
     "unclosedCalendar": {
@@ -253,7 +308,14 @@
           {
             "dtstart": "20240101",
             "end": "VCALENDAR",
-            "component": "VEVENT"
+            "component": "VEVENT",
+            "extra": [
+              {
+                "name": "END",
+                "parameters": [],
+                "value": "VCALENDAR"
+              }
+            ]
           }
         ]
       }
@@ -262,7 +324,14 @@
       "ok": {
         "component": "VCALENDAR",
         "prodid": "-//Test//EN",
-        "version": "2.0"
+        "version": "2.0",
+        "extra": [
+          {
+            "name": "DTSTART",
+            "parameters": [],
+            "value": "20240101"
+          }
+        ]
       }
     },
     "leadingContinuation": {
@@ -310,7 +379,13 @@
       "ok": {
         "component": "VCALENDAR",
         "prodid": "-//Test//EN",
-        "version": "2.0"
+        "version": "2.0",
+        "components": [
+          {
+            "component": "",
+            "properties": []
+          }
+        ]
       }
     },
     "descriptionAfterEvent": {
@@ -332,7 +407,24 @@
       "ok": {
         "component": "VCALENDAR",
         "prodid": "-//Outer//EN",
-        "version": "2.0"
+        "version": "2.0",
+        "components": [
+          {
+            "component": "VCALENDAR",
+            "properties": [
+              {
+                "name": "VERSION",
+                "parameters": [],
+                "value": "2.0"
+              },
+              {
+                "name": "PRODID",
+                "parameters": [],
+                "value": "-//Inner//EN"
+              }
+            ]
+          }
+        ]
       }
     },
     "calendarValuesWithColons": {

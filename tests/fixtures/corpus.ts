@@ -26,6 +26,16 @@
  *   event gained `parameters` (`DTSTART`'s `TZID`, the first `ATTENDEE`'s
  *   `CN` and `ROLE`, and an empty list for the second attendee); every
  *   existing key is unchanged.
+ * - #24: untyped properties are kept as read in each component's `extra`,
+ *   and sub-components of a type the model does not hold there in its
+ *   `components`. Golden entries gained only those keys: in
+ *   `parse.everyComponent` the calendar's `X-WR-CALNAME` and `X-CUSTOM`,
+ *   the event's `SEQUENCE` and `GEO`, and the free/busy's `FREEBUSY`;
+ *   `unclosedEvent` and `unclosedEventThenInvalid` the leaked lines on the
+ *   calendar; `mismatchedEnd` the event's `END:VCALENDAR`; `emptyBegin` the
+ *   empty-named component; and `nestedCalendar` the inner `VCALENDAR`.
+ *   Every existing key, the lower-cased untyped fields included, is
+ *   unchanged.
  *
  * The only seam is how an Effect is run (`Run`); the golden file was produced
  * by running this corpus against the Effect 3 sources.

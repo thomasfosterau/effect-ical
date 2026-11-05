@@ -11,7 +11,11 @@
  * `CATEGORIES` line splits at its unescaped commas. Other values are kept
  * verbatim: dates, durations and recurrence rules are not decoded. Parameters
  * of the typed fields (`DTSTART;TZID=…`, `ATTENDEE;CN=…`) are kept in each
- * component's `parameters` (see {@link Types.FieldParameters}).
+ * component's `parameters` (see {@link Types.FieldParameters}). Properties a
+ * component does not type are kept, as read, in its `extra`, and
+ * sub-components of a type the model does not hold there in its
+ * `components` (see {@link Types.Preserved}), so `encode(parse(text))` loses
+ * nothing.
  *
  * @module
  */
@@ -30,7 +34,13 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
 import * as ContentLine from "./ContentLine.js";
-import { fieldName, isArrayProperty, isTypedProperty } from "./properties.js";
+import {
+  fieldName,
+  isArrayProperty,
+  isKnownChild,
+  isTypedProperty,
+  subComponents,
+} from "./properties.js";
 import type * as Types from "./types.js";
 
 /**
@@ -65,25 +75,39 @@ interface NameValue {
   readonly name: string;
   readonly parameters: ReadonlyArray<ContentLine.Parameter>;
   readonly value: string;
+  /** The line as read, for `extra` and unknown components. */
+  readonly content: ContentLine.ContentLine;
 }
 
 /** A property value as the parser produces it. */
 type PropertyValue = string | number | ReadonlyArray<string | number>;
 
-/** One field of a parsed component: a property, a sub-component list or `parameters`. */
-type FieldValue = PropertyValue | ReadonlyArray<RawComponent> | Types.FieldParameters;
+/**
+ * One field of a parsed component: a property, a sub-component list, or one
+ * of the {@link Types.Preserved} fields.
+ */
+type FieldValue =
+  | PropertyValue
+  | ReadonlyArray<RawComponent>
+  | Types.FieldParameters
+  | ReadonlyArray<ContentLine.ContentLine>
+  | ReadonlyArray<Types.UnknownComponent>;
 
 /**
  * A parsed component: its properties by field name, plus sub-component fields
- * and `parameters`.
+ * and the {@link Types.Preserved} fields.
  */
 interface RawComponent {
   readonly [field: string]: FieldValue;
 }
 
-/** A parsed component, its direct children and the index of its `END` line. */
+/**
+ * A parsed component (as the model's fields, and verbatim), its direct
+ * children and the index of its `END` line.
+ */
 interface ParsedComponent {
   readonly component: RawComponent;
+  readonly raw: Types.UnknownComponent;
   readonly componentType: string;
   readonly children: ReadonlyArray<ParsedComponent>;
   readonly endIndex: number;
@@ -124,7 +148,15 @@ const nameAndValue = /*#__PURE__*/ Compiler.jit(
 const parseLegacyLine = (line: string): Result.Result<NameValue, ParseError> =>
   Result.mapBoth(Parser.parse(nameAndValue, line), {
     onFailure: () => new ParseError({ message: `Invalid content line: ${line}` }),
-    onSuccess: ({ name, value }) => ({ name: Str.toUpperCase(name), parameters: [], value }),
+    onSuccess: ({ name, value }) => {
+      const upper = Str.toUpperCase(name);
+      return {
+        name: upper,
+        parameters: [],
+        value,
+        content: { name: upper, parameters: [], value },
+      };
+    },
   });
 
 /**
@@ -142,6 +174,7 @@ const parseContentLine = (line: string): Result.Result<NameValue, ParseError> =>
         ),
         parameters: content.parameters,
         value: content.value,
+        content,
       }),
   });
 
@@ -226,9 +259,10 @@ const fieldParameters = (
 /**
  * Collect a component's property lines into fields: the last occurrence of a
  * single-valued property wins; repeatable ones collect into arrays in order.
- * `parameters` is set when some line carried parameters.
+ * Untyped properties are collected too, under their lower-cased names, as
+ * they always were; {@link preserved} keeps them as read in `extra`.
  */
-const collectProperties = (componentType: string, lines: ReadonlyArray<NameValue>) => {
+const collectProperties = (lines: ReadonlyArray<NameValue>) => {
   const [repeated, single] = Arr.partition(lines, (line) =>
     isArrayProperty(line.name) ? Result.succeed(line) : Result.fail(line),
   );
@@ -236,7 +270,6 @@ const collectProperties = (componentType: string, lines: ReadonlyArray<NameValue
     Arr.map(single, ({ name, value }) => [fieldName(name), propertyValue(name, value)] as const),
   );
   const groups = Arr.groupBy(repeated, ({ name }) => fieldName(name));
-  const parameters = fieldParameters(componentType, lines);
   return {
     ...singles,
     ...R.map(groups, (group) =>
@@ -246,11 +279,59 @@ const collectProperties = (componentType: string, lines: ReadonlyArray<NameValue
           : [propertyValue(name, value)],
       ),
     ),
+  };
+};
+
+/** `Some(values)` when there are any, otherwise `None`. */
+const nonEmpty = <A>(values: ReadonlyArray<A>): Option.Option<ReadonlyArray<A>> =>
+  Arr.isReadonlyArrayNonEmpty(values) ? Option.some(values) : Option.none();
+
+/**
+ * The {@link Types.Preserved} fields of a component, each set only when
+ * non-empty: its typed fields' `parameters`, its untyped property lines as
+ * read (`extra`), and its children of a type it does not hold in a field,
+ * verbatim (`components`).
+ */
+const preserved = (
+  componentType: string,
+  lines: ReadonlyArray<NameValue>,
+  children: ReadonlyArray<ParsedComponent>,
+): Types.Preserved => {
+  const parameters = fieldParameters(componentType, lines);
+  // One `getSomes` per field: each record is homogeneous in its value type.
+  return {
     ...R.getSomes({
       parameters: R.isEmptyRecord(parameters) ? Option.none() : Option.some(parameters),
     }),
+    ...R.getSomes({
+      extra: nonEmpty(
+        Arr.filterMap(lines, ({ name, content }) =>
+          isTypedProperty(componentType)(name) ? Result.failVoid : Result.succeed(content),
+        ),
+      ),
+    }),
+    ...R.getSomes({
+      components: nonEmpty(
+        Arr.filterMap(children, (child) =>
+          isKnownChild(componentType)(child.componentType)
+            ? Result.failVoid
+            : Result.succeed(child.raw),
+        ),
+      ),
+    }),
   };
 };
+
+/** A component kept verbatim: its property lines as read and its children, in order. */
+const verbatim = (
+  componentType: string,
+  lines: ReadonlyArray<NameValue>,
+  children: ReadonlyArray<ParsedComponent>,
+): Types.UnknownComponent => ({
+  component: componentType,
+  properties: Arr.map(lines, ({ content }) => content),
+  ...R.getSomes({ components: nonEmpty(Arr.map(children, ({ raw }) => raw)) }),
+});
 
 const ofType =
   (children: ReadonlyArray<ParsedComponent>) =>
@@ -265,17 +346,8 @@ const subComponentFields = (
   children: ReadonlyArray<ParsedComponent>,
 ): Record<string, ReadonlyArray<RawComponent>> => {
   const children_ = ofType(children);
-  const fields: ReadonlyArray<readonly [string, string]> =
-    componentType === "VEVENT" || componentType === "VTODO"
-      ? [["alarms", "VALARM"]]
-      : componentType === "VTIMEZONE"
-        ? [
-            ["standard", "STANDARD"],
-            ["daylight", "DAYLIGHT"],
-          ]
-        : [];
   return R.fromEntries(
-    Arr.filterMap(fields, ([field, type]) => {
+    Arr.filterMap(subComponents(componentType), ([field, type]) => {
       const matching = children_(type);
       return Arr.isReadonlyArrayNonEmpty(matching)
         ? Result.succeed([field, matching] as const)
@@ -363,12 +435,15 @@ const parseComponent = (
       Child: () => Result.fail(notClosed()),
       Close: ({ index }) => {
         const children = childrenOf(steps);
+        const properties = propertiesOf(steps);
         return Result.succeed({
           component: {
-            ...collectProperties(componentType, propertiesOf(steps)),
+            ...collectProperties(properties),
             component: componentType,
             ...subComponentFields(componentType, children),
+            ...preserved(componentType, properties, children),
           },
+          raw: verbatim(componentType, properties, children),
           componentType,
           children,
           endIndex: index,
@@ -418,6 +493,8 @@ const toCalendar = ({ component: calendar, children }: ParsedComponent) => {
       name: calendar["name"],
       description: calendar["description"],
       parameters: calendar["parameters"],
+      extra: calendar["extra"],
+      components: calendar["components"],
     },
     P.isNotUndefined,
   );
@@ -447,7 +524,8 @@ const toCalendar = ({ component: calendar, children }: ParsedComponent) => {
  * Parse an iCalendar string into a {@link Types.VCalendar}, synchronously.
  *
  * Text before the first `BEGIN:VCALENDAR` and after its `END:VCALENDAR` is
- * ignored. Components of an unknown type parse but are not kept.
+ * ignored. Components of a type the model does not hold where they appear
+ * are kept verbatim in their parent's `components`.
  *
  * @example
  * ```ts

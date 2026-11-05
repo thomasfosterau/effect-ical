@@ -37,12 +37,36 @@ export interface FieldParameters {
 }
 
 /**
+ * A component kept verbatim: one whose type the model does not hold where it
+ * appears (`VAVAILABILITY`, `VLOCATION`, an `X-` component, a `VALARM` inside
+ * a `VJOURNAL`, …), with its property lines as read and its own
+ * sub-components, in order.
+ */
+export interface UnknownComponent {
+  /** The component type, as its `BEGIN` line names it */
+  readonly component: string;
+  /** Its property lines, in order, with raw (still escaped) values */
+  readonly properties: ReadonlyArray<ContentLine.ContentLine>;
+  /** Its sub-components, in order */
+  readonly components?: ReadonlyArray<UnknownComponent>;
+}
+
+/**
  * What every component keeps beyond its typed fields, so that encoding a
  * parsed calendar loses nothing the model can hold.
  */
 export interface Preserved {
   /** Parameters of the typed fields (`DTSTART;TZID=…`, `ATTENDEE;CN=…`). */
   parameters?: FieldParameters;
+  /**
+   * The properties the component does not type (`X-` and IANA properties
+   * such as `SEQUENCE`, `CREATED`, `TRANSP`, `GEO`, `FREEBUSY`), in order,
+   * as read: raw (still escaped) values, parameters included. The encoder
+   * writes them after the typed fields.
+   */
+  extra?: ReadonlyArray<ContentLine.ContentLine>;
+  /** Sub-components of a type the model does not hold here, verbatim, in order. */
+  components?: ReadonlyArray<UnknownComponent>;
 }
 
 /**
