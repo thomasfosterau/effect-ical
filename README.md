@@ -9,7 +9,7 @@ iCalendar ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)) and vCard 
 
 | Package | Purpose | Peers |
 | --- | --- | --- |
-| [`@thomasfosterau/effect-ical`](https://www.npmjs.com/package/@thomasfosterau/effect-ical) | iCalendar parse, encode and build | `effect` `>=4.0.0`, `@thomasfosterau/effect-parse` `^0.2.0` |
+| [`@thomasfosterau/effect-ical`](https://www.npmjs.com/package/@thomasfosterau/effect-ical) | iCalendar parse, encode and build | `effect` `>=4.0.0`, `@thomasfosterau/effect-parse` `^0.4.1` |
 
 ## Install
 
