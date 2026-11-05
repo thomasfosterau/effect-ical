@@ -20,7 +20,7 @@ import * as Parser from "@thomasfosterau/effect-parse/Parser";
 import * as Token from "@thomasfosterau/effect-parse/Token";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
-import * as Record from "effect/Record";
+import * as R from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
@@ -419,7 +419,7 @@ export const fold = (line: string): string => {
   const segments = Arr.groupBy(Arr.zip(chars, states), ([, state]) => String(state.segment));
   return Arr.join(
     Arr.map(
-      Record.values(segments),
+      R.values(segments),
       (segment, index) =>
         (index === 0 ? "" : " ") +
         Arr.join(

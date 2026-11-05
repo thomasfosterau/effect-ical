@@ -28,7 +28,7 @@ import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
-import * as Record from "effect/Record";
+import * as R from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
@@ -194,7 +194,7 @@ const parametersOf = (property: Property<unknown>): ReadonlyArray<ContentLine.Pa
 
 /** `{ [key]: value }` when the value is present, otherwise nothing. */
 const entry = <K extends string, V>(key: K, value: Option.Option<V>): { readonly [P in K]?: V } =>
-  Option.match(value, { onNone: () => ({}), onSome: (v) => Record.singleton(key, v) });
+  Option.match(value, { onNone: () => ({}), onSome: (v) => R.singleton(key, v) });
 
 /** A comma-separated list of parameter text (one quoted `TYPE` value). */
 const commaList = /*#__PURE__*/ Compiler.jit(
@@ -367,13 +367,13 @@ const many = <K extends string, A>(
   field: K,
   taken: Taken<A>,
 ): { readonly [P in K]?: ReadonlyArray<Property<A>> } =>
-  Arr.isReadonlyArrayNonEmpty(taken.properties) ? Record.singleton(field, taken.properties) : {};
+  Arr.isReadonlyArrayNonEmpty(taken.properties) ? R.singleton(field, taken.properties) : {};
 
 /** `{ [field]: property }` when there is one, otherwise nothing. */
 const one = <K extends string, A>(field: K, taken: Taken<A>): { readonly [P in K]?: Property<A> } =>
   Option.match(Arr.head(taken.properties), {
     onNone: () => ({}),
-    onSome: (property) => Record.singleton(field, property),
+    onSome: (property) => R.singleton(field, property),
   });
 
 // ---------------------------------------------------------------------------
@@ -453,7 +453,7 @@ const toCard = (
     return Result.fail(fail("FN property is required"));
   }
   const used = HashSet.fromIterable([
-    ...Arr.flatMap(Record.values(fields), (field: Taken<unknown>) => field.used),
+    ...Arr.flatMap(R.values(fields), (field: Taken<unknown>) => field.used),
     ...Arr.take(
       Arr.filterMap(indexed, ({ line, index }) =>
         line.name === "VERSION" ? Result.succeed(index) : Result.failVoid,
