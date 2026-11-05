@@ -9,7 +9,9 @@
  * TEXT values (`SUMMARY`, `DESCRIPTION`, `LOCATION`, `COMMENT`, `CONTACT`,
  * `NAME`, `TZNAME`, `X-WR-CALNAME`, `X-WR-CALDESC`) are unescaped, and each
  * `CATEGORIES` line splits at its unescaped commas. Other values are kept
- * verbatim: dates, durations and recurrence rules are not decoded.
+ * verbatim: dates, durations and recurrence rules are not decoded. Parameters
+ * of the typed fields (`DTSTART;TZID=…`, `ATTENDEE;CN=…`) are kept in each
+ * component's `parameters` (see {@link Types.FieldParameters}).
  *
  * @module
  */
@@ -28,6 +30,7 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
 import * as ContentLine from "./ContentLine.js";
+import { fieldName, isArrayProperty, isTypedProperty } from "./properties.js";
 import type * as Types from "./types.js";
 
 /**
@@ -54,17 +57,29 @@ export class ParseError extends Schema.TaggedError<ParseError, { readonly brand:
 /** A 1-based line and column in the input. */
 type Position = ContentLine.Position;
 
-/** One content line: `NAME[;PARAM=VALUE]*:VALUE`, with the name upper-cased. */
+/**
+ * One content line: `NAME[;PARAM=VALUE]*:VALUE`, with the name upper-cased
+ * (and prefixed by its group, if it has one) and its parameters in order.
+ */
 interface NameValue {
   readonly name: string;
+  readonly parameters: ReadonlyArray<ContentLine.Parameter>;
   readonly value: string;
 }
 
 /** A property value as the parser produces it. */
 type PropertyValue = string | number | ReadonlyArray<string | number>;
 
-/** A parsed component: its properties by field name, plus sub-component fields. */
-type RawComponent = Readonly<Record<string, PropertyValue | ReadonlyArray<RawComponent>>>;
+/** One field of a parsed component: a property, a sub-component list or `parameters`. */
+type FieldValue = PropertyValue | ReadonlyArray<RawComponent> | Types.FieldParameters;
+
+/**
+ * A parsed component: its properties by field name, plus sub-component fields
+ * and `parameters`.
+ */
+interface RawComponent {
+  readonly [field: string]: FieldValue;
+}
 
 /** A parsed component, its direct children and the index of its `END` line. */
 interface ParsedComponent {
@@ -88,11 +103,12 @@ const Step = Data.taggedEnum<Step>();
 type Line = ContentLine.UnfoldedLine;
 
 /**
- * A content line as this parser has always read it: the name is the text
- * before the first `;` or `:`, the parameters (everything up to the first
- * `:`, quoted or not) are skipped, and the value is the rest. Unlike
- * `ContentLine.parse`, a quoted `:` in a parameter ends the parameters, as
- * the golden corpus pins (keeping parameters is #22).
+ * A content line as this parser read it before it kept parameters: the name
+ * is the text before the first `;` or `:`, the parameters (everything up to
+ * the first `:`, quoted or not) are skipped, and the value is the rest. It is
+ * the fallback for a line `ContentLine.parse` rejects (an unterminated quote,
+ * a name with characters RFC 5545 does not allow), so the parser accepts
+ * exactly the lines it always has; such a line keeps no parameters.
  */
 const nameAndValue = /*#__PURE__*/ Compiler.jit(
   /*#__PURE__*/ Parser.struct({
@@ -104,18 +120,30 @@ const nameAndValue = /*#__PURE__*/ Compiler.jit(
   }),
 );
 
-/** Parse a content line into its upper-cased name and its value. */
-const parseContentLine = (line: string): Result.Result<NameValue, ParseError> =>
+/** A line without its parameters, read by {@link nameAndValue}. */
+const parseLegacyLine = (line: string): Result.Result<NameValue, ParseError> =>
   Result.mapBoth(Parser.parse(nameAndValue, line), {
     onFailure: () => new ParseError({ message: `Invalid content line: ${line}` }),
-    onSuccess: ({ name, value }) => ({ name: Str.toUpperCase(name), value }),
+    onSuccess: ({ name, value }) => ({ name: Str.toUpperCase(name), parameters: [], value }),
   });
 
-/** RFC property names whose field name is not simply the lower-cased name. */
-const propertyNameMap: R.ReadonlyRecord<string, string> = {
-  "PERCENT-COMPLETE": "percent",
-  "LAST-MODIFIED": "lastmod",
-};
+/**
+ * Parse a content line into its upper-cased name, its parameters and its
+ * value: with `ContentLine.parse` (so a quoted `:` in a parameter value stays
+ * in the parameter), falling back to {@link parseLegacyLine}.
+ */
+const parseContentLine = (line: string): Result.Result<NameValue, ParseError> =>
+  Result.match(ContentLine.parse(line), {
+    onFailure: () => parseLegacyLine(line),
+    onSuccess: (content) =>
+      Result.succeed({
+        name: Str.toUpperCase(
+          content.group === undefined ? content.name : `${content.group}.${content.name}`,
+        ),
+        parameters: content.parameters,
+        value: content.value,
+      }),
+  });
 
 /** Properties whose value is parsed as an integer (kept as text if it is not one). */
 const numericProperties = [
@@ -125,9 +153,6 @@ const numericProperties = [
   "REPEAT",
   "SEQUENCE",
 ] as const;
-
-/** Properties that may repeat, collected into an array in order. */
-const arrayProperties = ["ATTENDEE", "CATEGORIES", "RDATE", "EXDATE"] as const;
 
 const isOneOf =
   (names: ReadonlyArray<string>) =>
@@ -151,12 +176,8 @@ const textProperties = [
 const textListProperties = ["CATEGORIES"] as const;
 
 const isNumericProperty = isOneOf(numericProperties);
-const isArrayProperty = isOneOf(arrayProperties);
 const isTextProperty = isOneOf(textProperties);
 const isTextListProperty = isOneOf(textListProperties);
-
-const fieldName = (name: string): string =>
-  Option.getOrElse(R.get(propertyNameMap, name), () => name.toLowerCase());
 
 /**
  * The integer a numeric property's value starts with, read as
@@ -179,10 +200,35 @@ const propertyValue = (name: string, value: string): string | number =>
       : value;
 
 /**
+ * The parameters of a component's typed property lines, by field (see
+ * {@link Types.FieldParameters}): the kept line's for a single-valued
+ * property, every line's for a repeatable one, and only the fields where some
+ * line carried parameters.
+ */
+const fieldParameters = (
+  componentType: string,
+  lines: ReadonlyArray<NameValue>,
+): Types.FieldParameters =>
+  R.filter(
+    R.map(
+      Arr.groupBy(
+        Arr.filter(lines, ({ name }) => isTypedProperty(componentType)(name)),
+        ({ name }) => fieldName(name),
+      ),
+      (group): ReadonlyArray<ReadonlyArray<ContentLine.Parameter>> =>
+        isArrayProperty(group[0].name)
+          ? Arr.map(group, ({ parameters }) => parameters)
+          : [Arr.lastNonEmpty(group).parameters],
+    ),
+    (lists) => Arr.some(lists, Arr.isReadonlyArrayNonEmpty),
+  );
+
+/**
  * Collect a component's property lines into fields: the last occurrence of a
  * single-valued property wins; repeatable ones collect into arrays in order.
+ * `parameters` is set when some line carried parameters.
  */
-const collectProperties = (lines: ReadonlyArray<NameValue>) => {
+const collectProperties = (componentType: string, lines: ReadonlyArray<NameValue>) => {
   const [repeated, single] = Arr.partition(lines, (line) =>
     isArrayProperty(line.name) ? Result.succeed(line) : Result.fail(line),
   );
@@ -190,6 +236,7 @@ const collectProperties = (lines: ReadonlyArray<NameValue>) => {
     Arr.map(single, ({ name, value }) => [fieldName(name), propertyValue(name, value)] as const),
   );
   const groups = Arr.groupBy(repeated, ({ name }) => fieldName(name));
+  const parameters = fieldParameters(componentType, lines);
   return {
     ...singles,
     ...R.map(groups, (group) =>
@@ -199,6 +246,9 @@ const collectProperties = (lines: ReadonlyArray<NameValue>) => {
           : [propertyValue(name, value)],
       ),
     ),
+    ...R.getSomes({
+      parameters: R.isEmptyRecord(parameters) ? Option.none() : Option.some(parameters),
+    }),
   };
 };
 
@@ -315,7 +365,7 @@ const parseComponent = (
         const children = childrenOf(steps);
         return Result.succeed({
           component: {
-            ...collectProperties(propertiesOf(steps)),
+            ...collectProperties(componentType, propertiesOf(steps)),
             component: componentType,
             ...subComponentFields(componentType, children),
           },
@@ -335,19 +385,12 @@ const isCalendarBegin = (line: Line): boolean =>
   });
 
 /**
- * A raw field as text, the way `String()` renders a property value (a
- * repeated property's values joined by `,`). A sub-component list never sits
- * under a property's field name, so it renders as a placeholder.
+ * A raw `VERSION` field as text, the way `String()` renders a property
+ * value. `VERSION` is single-valued, so it is always a string or a number;
+ * anything else (unreachable from parsed text) renders as a placeholder.
  */
-const describeField = (value: PropertyValue | ReadonlyArray<RawComponent>): string =>
-  P.isString(value) || P.isNumber(value)
-    ? String(value)
-    : Arr.join(
-        Arr.map(value, (item: string | number | RawComponent) =>
-          P.isString(item) || P.isNumber(item) ? String(item) : "[component]",
-        ),
-        ",",
-      );
+const describeField = (value: FieldValue): string =>
+  P.isString(value) || P.isNumber(value) ? String(value) : "[component]";
 
 /**
  * Validate the parsed `VCALENDAR` and sort its children into the
@@ -374,6 +417,7 @@ const toCalendar = ({ component: calendar, children }: ParsedComponent) => {
       method: calendar["method"],
       name: calendar["name"],
       description: calendar["description"],
+      parameters: calendar["parameters"],
     },
     P.isNotUndefined,
   );

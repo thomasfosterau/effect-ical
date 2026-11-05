@@ -7,10 +7,48 @@
  * @module
  */
 
+import type * as ContentLine from "./ContentLine.js";
+
+/**
+ * The parameters of a component's typed fields, keyed by field name (`dtstart`,
+ * `attendee`, …), as the parser read them and the encoder writes them back.
+ *
+ * Each field holds one parameter list per content line its value came from:
+ * a single-valued field has one (the line whose value was kept); `attendee`,
+ * `rdate` and `exdate` have one per value, in order; `categories` has one per
+ * `CATEGORIES` line (the encoder writes one line, with the first list). The
+ * parser sets a field only when one of its lines carried parameters, and sets
+ * `parameters` only when some field did.
+ *
+ * @example
+ * ```ts
+ * import { ContentLine, parseResult } from "@thomasfosterau/effect-ical"
+ * import * as Result from "effect/Result"
+ *
+ * const text = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//EN\r\nBEGIN:VEVENT\r\nDTSTART;TZID=Europe/Paris:20240115T100000\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+ * const result = parseResult(text)
+ * if (Result.isSuccess(result)) {
+ *   result.success.events?.[0]?.parameters?.["dtstart"]?.[0] // [{ name: "TZID", values: ["Europe/Paris"] }]
+ * }
+ * ```
+ */
+export interface FieldParameters {
+  readonly [field: string]: ReadonlyArray<ReadonlyArray<ContentLine.Parameter>>;
+}
+
+/**
+ * What every component keeps beyond its typed fields, so that encoding a
+ * parsed calendar loses nothing the model can hold.
+ */
+export interface Preserved {
+  /** Parameters of the typed fields (`DTSTART;TZID=…`, `ATTENDEE;CN=…`). */
+  parameters?: FieldParameters;
+}
+
 /**
  * Properties every scheduling component (event, to-do, journal, free/busy) may carry.
  */
-export interface BaseProperties {
+export interface BaseProperties extends Preserved {
   /** Unique identifier for the component */
   uid?: string;
   /** Date-time stamp indicating when the component was created */
@@ -135,9 +173,25 @@ export interface VFreeBusy extends BaseProperties {
 }
 
 /**
+ * A `STANDARD` or `DAYLIGHT` observance inside a {@link VTimezone}.
+ */
+export interface Observance extends Preserved {
+  /** Date-time when the observance begins */
+  dtstart: string;
+  /** UTC offset in use before the onset */
+  tzoffsetfrom: string;
+  /** UTC offset in use from the onset */
+  tzoffsetto: string;
+  /** Recurrence rule for the onset */
+  rrule?: string;
+  /** Customary name of the observance (e.g. `BST`) */
+  tzname?: string;
+}
+
+/**
  * A `VTIMEZONE` component: a time zone definition, with its standard and daylight observances.
  */
-export interface VTimezone {
+export interface VTimezone extends Preserved {
   /** Component type identifier */
   readonly component: "VTIMEZONE";
   /** Timezone identifier */
@@ -147,27 +201,15 @@ export interface VTimezone {
   /** Timezone URL */
   tzurl?: string;
   /** Standard time components */
-  standard?: Array<{
-    dtstart: string;
-    tzoffsetfrom: string;
-    tzoffsetto: string;
-    rrule?: string;
-    tzname?: string;
-  }>;
+  standard?: Observance[];
   /** Daylight saving time components */
-  daylight?: Array<{
-    dtstart: string;
-    tzoffsetfrom: string;
-    tzoffsetto: string;
-    rrule?: string;
-    tzname?: string;
-  }>;
+  daylight?: Observance[];
 }
 
 /**
  * A `VALARM` component: a reminder attached to an event or to-do.
  */
-export interface VAlarm {
+export interface VAlarm extends Preserved {
   /** Component type identifier */
   readonly component: "VALARM";
   /** Action to perform when alarm triggers */
@@ -196,7 +238,7 @@ export type Component = VEvent | VTodo | VJournal | VFreeBusy | VTimezone;
 /**
  * A `VCALENDAR` object: the top-level iCalendar container.
  */
-export interface VCalendar {
+export interface VCalendar extends Preserved {
   /** Component type identifier */
   readonly component: "VCALENDAR";
   /** Product identifier */

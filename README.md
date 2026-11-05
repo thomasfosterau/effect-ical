@@ -62,7 +62,7 @@ Everything is exported from the package root.
 | `parseResult` | `(text: string) => Result<VCalendar, ParseError>` | The same parse, synchronously. |
 | `ParseError` | tagged error, `_tag: "ParseError"`, `message`, optional `line` / `column` | No `VCALENDAR`, an unclosed calendar, a line without `:`, a missing or non-`2.0` `VERSION`, or a missing `PRODID`. For a line without `:` or an unclosed component, `line` and `column` (1-based) locate the offending line or the component's `BEGIN` line. |
 
-Text before the first `BEGIN:VCALENDAR` and after its `END:VCALENDAR` is ignored, and so are components of an unknown type. Property names become lower-cased fields (`PERCENT-COMPLETE` → `percent`, `LAST-MODIFIED` → `lastmod`, `X-WR-CALNAME` → `"x-wr-calname"`); `PRIORITY`, `PERCENT-COMPLETE`, `REPEAT` and `SEQUENCE` become numbers when they are integers. TEXT values (`SUMMARY`, `DESCRIPTION`, `LOCATION`, `COMMENT`, `CONTACT`, `NAME`, `TZNAME`, `X-WR-CALNAME`, `X-WR-CALDESC`) are unescaped (`\\`, `\;`, `\,`, `\n` / `\N`; other backslash sequences are kept), and each `CATEGORIES` line splits at its unescaped commas. Property parameters (`;TZID=…`) are dropped.
+Text before the first `BEGIN:VCALENDAR` and after its `END:VCALENDAR` is ignored, and so are components of an unknown type. Property names become lower-cased fields (`PERCENT-COMPLETE` → `percent`, `LAST-MODIFIED` → `lastmod`, `X-WR-CALNAME` → `"x-wr-calname"`); `PRIORITY`, `PERCENT-COMPLETE`, `REPEAT` and `SEQUENCE` become numbers when they are integers. TEXT values (`SUMMARY`, `DESCRIPTION`, `LOCATION`, `COMMENT`, `CONTACT`, `NAME`, `TZNAME`, `X-WR-CALNAME`, `X-WR-CALDESC`) are unescaped (`\\`, `\;`, `\,`, `\n` / `\N`; other backslash sequences are kept), and each `CATEGORIES` line splits at its unescaped commas. The parameters of the typed fields (`DTSTART;TZID=…`, `ATTENDEE;CN=…`) are kept in the component's `parameters`, keyed by field name, with one parameter list per content line: `event.parameters?.dtstart?.[0]` is `DTSTART`'s, and `event.parameters?.attendee?.[i]` is the `i`-th attendee's. A field is present only when one of its lines carried parameters. Lines are read with `ContentLine.parse`, so a quoted `:` in a parameter value stays in the parameter; a line it rejects (an unterminated quote) is still read, without parameters.
 
 ```ts
 import { parseResult } from "@thomasfosterau/effect-ical";
@@ -87,11 +87,11 @@ if (Result.isSuccess(result)) {
 | `encodeSync` | `(calendar: VCalendar) => string` | Throws the `EncodeError`. |
 | `EncodeError` | tagged error, `_tag: "EncodeError"`, `message` | `version` or `prodid` missing or empty (only possible for a value that bypassed the types). |
 
-Components are written in a fixed order: timezones, events, to-dos, journals, free/busy. Optional string properties that are empty are omitted; numeric ones (`priority`, `percent`, `repeat`) are written whenever set, `0` included. `SUMMARY`, `DESCRIPTION`, `LOCATION`, `NAME`, `TZNAME` and each `CATEGORIES` item are escaped (`\`, `;`, `,`, newline); every other value is written as given.
+Components are written in a fixed order: timezones, events, to-dos, journals, free/busy. Optional string properties that are empty are omitted; numeric ones (`priority`, `percent`, `repeat`) are written whenever set, `0` included. `SUMMARY`, `DESCRIPTION`, `LOCATION`, `NAME`, `TZNAME` and each `CATEGORIES` item are escaped (`\`, `;`, `,`, newline); every other value is written as given. Each typed field's line carries the parameters its component's `parameters` keeps for it, so `encode(parse(text))` keeps `TZID`, `VALUE=DATE`, `CN`, `PARTSTAT` and the rest.
 
 ### The object model
 
-`VCalendar`, `VEvent`, `VTodo`, `VJournal`, `VFreeBusy`, `VTimezone` and `VAlarm` are plain TypeScript interfaces, one per component, each with a `component` discriminant (`"VEVENT"`, …). `VCalendar` holds the components in `timezones`, `events`, `todos`, `journals` and `freebusys`; events and to-dos hold their alarms in `alarms`.
+`VCalendar`, `VEvent`, `VTodo`, `VJournal`, `VFreeBusy`, `VTimezone` and `VAlarm` are plain TypeScript interfaces, one per component, each with a `component` discriminant (`"VEVENT"`, …). `VCalendar` holds the components in `timezones`, `events`, `todos`, `journals` and `freebusys`; events and to-dos hold their alarms in `alarms`. Every component (and each `STANDARD` / `DAYLIGHT` `Observance`) may also carry `parameters` (`FieldParameters`), the parameters of its typed fields.
 
 ```ts
 import { encodeSync } from "@thomasfosterau/effect-ical";
@@ -213,7 +213,7 @@ line.value; // "mailto:jane@example.com"
 ContentLine.format(line); // 'ATTENDEE;CN="Doe, Jane";PARTSTAT=ACCEPTED:mailto:jane@example.com'
 ```
 
-The root `parse` does not use `ContentLine.parse` yet: it still splits each line at its first `:` and drops parameters, as its golden corpus pins (keeping parameters is #22).
+The root `parse` reads every line with `ContentLine.parse`, falling back to its earlier split at the first `:` (without parameters) for a line `ContentLine.parse` rejects.
 
 ### vCard 4.0: `VCard`
 

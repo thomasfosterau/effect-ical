@@ -103,7 +103,30 @@
                 "trigger": "-PT5M",
                 "component": "VALARM"
               }
-            ]
+            ],
+            "parameters": {
+              "dtstart": [
+                [
+                  {
+                    "name": "TZID",
+                    "values": ["Europe/London"]
+                  }
+                ]
+              ],
+              "attendee": [
+                [
+                  {
+                    "name": "CN",
+                    "values": ["Doe, John"]
+                  },
+                  {
+                    "name": "ROLE",
+                    "values": ["REQ-PARTICIPANT"]
+                  }
+                ],
+                []
+              ]
+            }
           }
         ],
         "todos": [

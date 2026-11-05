@@ -21,6 +21,11 @@
  *   `parse.everyComponent`, the summary `Event\, escaped` became
  *   `Event, escaped`, and the categories `WORK,MEETING` became `WORK` and
  *   `MEETING`.
+ * - #22: the parser keeps the parameters of typed fields in each component's
+ *   `parameters`. The only golden change is that `parse.everyComponent`'s
+ *   event gained `parameters` (`DTSTART`'s `TZID`, the first `ATTENDEE`'s
+ *   `CN` and `ROLE`, and an empty list for the second attendee); every
+ *   existing key is unchanged.
  *
  * The only seam is how an Effect is run (`Run`); the golden file was produced
  * by running this corpus against the Effect 3 sources.
