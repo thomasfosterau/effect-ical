@@ -12,7 +12,7 @@
 
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as Record from "effect/Record";
+import * as R from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as ContentLine from "./ContentLine.js";
@@ -39,7 +39,7 @@ const formatContentLine = (
 ): string =>
   ContentLine.format({
     name,
-    parameters: Arr.map(Record.toEntries(params), ([key, param]) => ({
+    parameters: Arr.map(R.toEntries(params), ([key, param]) => ({
       name: key,
       values: [param],
     })),

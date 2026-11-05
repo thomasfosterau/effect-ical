@@ -25,8 +25,6 @@ import effect from "@enfect/oxlint";
  */
 const cacheInputs = [{ auto: true }, "!node_modules/**", "pnpm-lock.yaml"];
 
-const maxWorkers = process.env.VITEST_MAX_WORKERS;
-
 export default defineConfig({
   // Staged-file checks run by `vp staged` (pre-commit).
   staged: {
@@ -76,13 +74,6 @@ export default defineConfig({
             "The `Buffer` global is typed `any` wherever @cloudflare/workers-types is loaded. Use Uint8Array / TextEncoder / DataView.",
         },
       ],
-      // `casting-awareness` is an awareness prompt, not a defect rule — it
-      // fires on every `as`. Stays visible as a warning.
-      "effect/casting-awareness": "warn",
-      // Hard-codes abbreviations (`Arr`, `P`, `R`, …) with no options, so it is
-      // unsatisfiable under the full-name convention (`import * as Option from
-      // "effect/Option"`) this family shares with its consumers.
-      "effect/prefer-namespace-imports": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
       // `@category` is the docs vocabulary every export carries (AGENTS.md);
       // the rest of the JSDoc tag set stays checked.
@@ -98,18 +89,6 @@ export default defineConfig({
       "typescript/no-misused-spread": "off",
     },
     overrides: [
-      // This file is evaluated by Vite and Vitest in bare Node, before any
-      // Effect runtime exists — there is no `Config` provider to read from,
-      // so `process.env` is the only thing that works here.
-      {
-        files: ["vite.config.ts"],
-        rules: {
-          "effect/avoid-process-env": "off",
-          // `...(process.env.X ? { x } : {})` is how a vitest option is left
-          // unset under `exactOptionalPropertyTypes`.
-          "effect/no-conditional-empty-object-spread": "off",
-        },
-      },
       // `tests/helpers/effect.ts` IS the test harness boundary
       // `effect-run-in-body` names as the place to run an Effect, and each
       // example script is an entrypoint whose last line runs its program.
@@ -193,8 +172,9 @@ export default defineConfig({
     },
   },
   test: {
+    // No `maxWorkers` here: Vitest reads `VITEST_MAX_WORKERS` (CI sets 2)
+    // itself, so the config never touches `process.env`.
     include: ["tests/**/*.test.ts"],
-    ...(maxWorkers === undefined ? {} : { maxWorkers: Number(maxWorkers) }),
     coverage: {
       provider: "istanbul",
       // `json` writes coverage-final.json, the Istanbul map `fallow audit`

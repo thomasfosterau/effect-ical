@@ -29,7 +29,7 @@
  */
 
 import type * as Effect from "effect/Effect";
-import * as Record from "effect/Record";
+import * as R from "effect/Record";
 import * as Result from "effect/Result";
 import {
   BuildError,
@@ -45,7 +45,7 @@ import {
 import type { VCalendar, VEvent, VTodo } from "../../src/index.js";
 
 /** Calendar texts fed to the parser (and to `Calendar.decode`). */
-export const parseInputs: Readonly<Record<string, string>> = {
+export const parseInputs: R.ReadonlyRecord<string, string> = {
   simple: "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Test//Test//EN\nEND:VCALENDAR\n",
   crlf: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:a\r\nDTSTART:20240101T120000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
   folded:
@@ -177,7 +177,7 @@ const longText =
 const multiByteText = "Café ☕ réunion — 東京 meeting with 🎉 emoji and ümlauts ".repeat(4);
 
 /** Calendar values fed to the encoder. */
-export const encodeInputs: Readonly<Record<string, VCalendar>> = {
+export const encodeInputs: R.ReadonlyRecord<string, VCalendar> = {
   minimal: { component: "VCALENDAR", version: "2.0", prodid: "-//Test//EN" },
   // Deliberately invalid input, to exercise the encoder's own required-property
   // checks for callers that bypass the types.
@@ -364,7 +364,7 @@ const attempt = (build: () => Observed): Observed =>
   );
 
 /** The fluent builders; each scenario returns built components or encoded text. */
-const builderScenarios: Readonly<Record<string, () => Observed>> = {
+const builderScenarios: R.ReadonlyRecord<string, () => Observed> = {
   calendarWithEverything: () =>
     createCalendar("-//Test//EN")
       .calscale("GREGORIAN")
@@ -441,7 +441,7 @@ const builderScenarios: Readonly<Record<string, () => Observed>> = {
 };
 
 /** The pipeable `Calendar`, `Event` and `Todo` modules. */
-const moduleScenarios = (run: Run): Readonly<Record<string, () => Observed>> => ({
+const moduleScenarios = (run: Run): R.ReadonlyRecord<string, () => Observed> => ({
   eventEverything: () => {
     const event = Event.withClassification("CONFIDENTIAL")(
       Event.withPriority(0)(
@@ -544,9 +544,9 @@ const moduleScenarios = (run: Run): Readonly<Record<string, () => Observed>> => 
 
 /** Runs the whole corpus, running each Effect with `run`. */
 export const characterise = (run: Run) => ({
-  parse: Record.map(parseInputs, (text) => run(parse(text))),
-  decode: Record.map(parseInputs, (text) => run(Calendar.decode(text))),
-  encode: Record.map(encodeInputs, (calendar) => run(encode(calendar))),
-  builder: Record.map(builderScenarios, (scenario) => scenario()),
-  modules: Record.map(moduleScenarios(run), (scenario) => scenario()),
+  parse: R.map(parseInputs, (text) => run(parse(text))),
+  decode: R.map(parseInputs, (text) => run(Calendar.decode(text))),
+  encode: R.map(encodeInputs, (calendar) => run(encode(calendar))),
+  builder: R.map(builderScenarios, (scenario) => scenario()),
+  modules: R.map(moduleScenarios(run), (scenario) => scenario()),
 });

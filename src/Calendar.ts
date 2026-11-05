@@ -19,7 +19,7 @@ import * as Token from "@thomasfosterau/effect-parse/Token";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Record from "effect/Record";
+import * as R from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { Event } from "./Event.js";
@@ -259,7 +259,7 @@ const keyValueLines = /*#__PURE__*/ Compiler.jit(
  */
 export const decode = (icalString: string): Effect.Effect<Calendar, ParseError> =>
   Effect.suspend(() => {
-    const properties = Record.fromEntries(
+    const properties = R.fromEntries(
       Arr.filterMap(
         Result.getOrElse(Parser.parse(keyValueLines, icalString), () => []),
         ({ key, value }) =>
@@ -268,7 +268,7 @@ export const decode = (icalString: string): Effect.Effect<Calendar, ParseError> 
             : Result.failVoid,
       ),
     );
-    const property = (key: (typeof decodedProperties)[number]) => Record.get(properties, key);
+    const property = (key: (typeof decodedProperties)[number]) => R.get(properties, key);
     const prodid = Option.getOrElse(property("PRODID"), () => "");
     const version = Option.getOrElse(property("VERSION"), () => "2.0");
     if (!prodid) {

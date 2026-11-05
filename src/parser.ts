@@ -22,8 +22,8 @@ import * as Arr from "effect/Array";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import * as Record from "effect/Record";
+import * as P from "effect/Predicate";
+import * as R from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
@@ -112,7 +112,7 @@ const parseContentLine = (line: string): Result.Result<NameValue, ParseError> =>
   });
 
 /** RFC property names whose field name is not simply the lower-cased name. */
-const propertyNameMap: Readonly<Record<string, string>> = {
+const propertyNameMap: R.ReadonlyRecord<string, string> = {
   "PERCENT-COMPLETE": "percent",
   "LAST-MODIFIED": "lastmod",
 };
@@ -156,7 +156,7 @@ const isTextProperty = isOneOf(textProperties);
 const isTextListProperty = isOneOf(textListProperties);
 
 const fieldName = (name: string): string =>
-  Option.getOrElse(Record.get(propertyNameMap, name), () => name.toLowerCase());
+  Option.getOrElse(R.get(propertyNameMap, name), () => name.toLowerCase());
 
 /**
  * The integer a numeric property's value starts with, read as
@@ -182,17 +182,17 @@ const propertyValue = (name: string, value: string): string | number =>
  * Collect a component's property lines into fields: the last occurrence of a
  * single-valued property wins; repeatable ones collect into arrays in order.
  */
-const collectProperties = (lines: ReadonlyArray<NameValue>): Record<string, PropertyValue> => {
+const collectProperties = (lines: ReadonlyArray<NameValue>) => {
   const [repeated, single] = Arr.partition(lines, (line) =>
     isArrayProperty(line.name) ? Result.succeed(line) : Result.fail(line),
   );
-  const singles = Record.fromEntries(
+  const singles = R.fromEntries(
     Arr.map(single, ({ name, value }) => [fieldName(name), propertyValue(name, value)] as const),
   );
   const groups = Arr.groupBy(repeated, ({ name }) => fieldName(name));
   return {
     ...singles,
-    ...Record.map(groups, (group) =>
+    ...R.map(groups, (group) =>
       Arr.flatMap(group, ({ name, value }) =>
         isTextListProperty(name)
           ? Arr.map(ContentLine.splitValue(value, ","), ContentLine.unescapeText)
@@ -224,7 +224,7 @@ const subComponentFields = (
             ["daylight", "DAYLIGHT"],
           ]
         : [];
-  return Record.fromEntries(
+  return R.fromEntries(
     Arr.filterMap(fields, ([field, type]) => {
       const matching = children_(type);
       return Arr.isReadonlyArrayNonEmpty(matching)
@@ -340,11 +340,11 @@ const isCalendarBegin = (line: Line): boolean =>
  * under a property's field name, so it renders as a placeholder.
  */
 const describeField = (value: PropertyValue | ReadonlyArray<RawComponent>): string =>
-  Predicate.isString(value) || Predicate.isNumber(value)
+  P.isString(value) || P.isNumber(value)
     ? String(value)
     : Arr.join(
         Arr.map(value, (item: string | number | RawComponent) =>
-          Predicate.isString(item) || Predicate.isNumber(item) ? String(item) : "[component]",
+          P.isString(item) || P.isNumber(item) ? String(item) : "[component]",
         ),
         ",",
       );
@@ -364,20 +364,20 @@ const toCalendar = ({ component: calendar, children }: ParsedComponent) => {
       new ParseError({ message: `VERSION must be "2.0", got "${describeField(version)}"` }),
     );
   }
-  if (!prodid || !Predicate.isString(prodid)) {
+  if (!prodid || !P.isString(prodid)) {
     return Result.fail(new ParseError({ message: "PRODID property is required" }));
   }
   const of = ofType(children);
-  const properties = Record.filter(
+  const properties = R.filter(
     {
       calscale: calendar["calscale"],
       method: calendar["method"],
       name: calendar["name"],
       description: calendar["description"],
     },
-    Predicate.isNotUndefined,
+    P.isNotUndefined,
   );
-  const components = Record.filter(
+  const components = R.filter(
     {
       timezones: of("VTIMEZONE"),
       events: of("VEVENT"),
