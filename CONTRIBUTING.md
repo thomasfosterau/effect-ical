@@ -41,5 +41,5 @@ vp run test:unit                      # unit tests
 vp test run tests/ical.test.ts        # one file
 vp run test:coverage                  # coverage thresholds; writes coverage/coverage-final.json
 vp run build                          # emit dist/
-fallow audit                          # dead code, duplication, complexity (run test:coverage first)
+vp exec fallow audit                  # dead code, duplication, complexity (run test:coverage first)
 ```
