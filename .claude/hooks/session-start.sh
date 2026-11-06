@@ -59,19 +59,6 @@ LOCAL_BIN="${HOME:-/root}/.local/bin"
 
 mkdir -p "$LOCAL_BIN" 2>/dev/null || log "cannot create $LOCAL_BIN; continuing"
 
-# Link a binary into ~/.local/bin, replacing a stale link but never a real file.
-link_tool() {
-  src="$1"
-  name="$(basename "$src")"
-  dest="$LOCAL_BIN/$name"
-  [ -x "$src" ] || return 0
-  # Leave a real (non-symlink) binary alone: something deliberately installed it.
-  if [ -e "$dest" ] && [ ! -L "$dest" ]; then
-    return 0
-  fi
-  ln -sfn "$src" "$dest" 2>/dev/null || log "could not link $name"
-}
-
 # `vp` gets a re-exec shim rather than a plain symlink (copied from effect-web,
 # which took it from the gardeneria application, gardeneria #1663). A symlink
 # always resolves to $PROJECT_DIR's node_modules/vite-plus, even when invoked
@@ -106,6 +93,37 @@ SHIM
     || { rm -f "$dest.tmp" 2>/dev/null; log "could not write vp shim"; }
 }
 
+# A tool from node_modules/.bin (`fallow`) gets a re-exec shim too,
+# never a symlink (effect-wikimedia#219). pnpm's `.bin` entries are sh scripts that find
+# the package from `$0`; run through a symlink in ~/.local/bin, `$0` is the
+# link, so the script looks for the package under ~/.local and node exits
+# with MODULE_NOT_FOUND. The fallow gate then saw `fallow audit` exit 1 and let
+# every commit and push through ungated. A shim that execs the real path keeps
+# `$0` right. A symlink left by an earlier version of this hook (broken, or
+# stale) is removed, so it is replaced even when the tool is not installed yet.
+BIN_SHIM_MARKER="# generated-by: .claude/hooks/session-start.sh (node_modules/.bin re-exec shim, effect-wikimedia#219)"
+write_bin_shim() {
+  name="$1"
+  src="$PROJECT_DIR/node_modules/.bin/$name"
+  dest="$LOCAL_BIN/$name"
+  # Leave a real, non-generated file alone: something deliberately installed it.
+  if [ -e "$dest" ] && [ ! -L "$dest" ] \
+    && ! grep -qF "$BIN_SHIM_MARKER" "$dest" 2>/dev/null; then
+    return 0
+  fi
+  if [ -L "$dest" ]; then
+    rm -f "$dest" 2>/dev/null || { log "could not remove the old $name symlink"; return 0; }
+  fi
+  [ -x "$src" ] || return 0
+  cat >"$dest.tmp" <<SHIM
+#!/usr/bin/env bash
+$BIN_SHIM_MARKER
+exec "$src" "\$@"
+SHIM
+  chmod +x "$dest.tmp" 2>/dev/null && mv -f "$dest.tmp" "$dest" 2>/dev/null \
+    || { rm -f "$dest.tmp" 2>/dev/null; log "could not write $name shim"; }
+}
+
 if ! command -v node >/dev/null 2>&1; then
   log "node not found; nothing to provision"
   exit 0
@@ -136,7 +154,7 @@ if [ -f "$PROJECT_DIR/pnpm-lock.yaml" ]; then
 fi
 
 # node_modules/.bin only exists after the install, so link what it provides now.
-link_tool "$PROJECT_DIR/node_modules/.bin/fallow"
+write_bin_shim fallow
 write_vp_shim
 
 exit 0
