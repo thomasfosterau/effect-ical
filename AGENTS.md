@@ -52,7 +52,7 @@
 - `pnpm audit --audit-level high`: the dependency audit CI runs (network).
 - `pnpm changeset`: add a changeset.
 
-`vp` is `node_modules/.bin/vp`; the SessionStart hook puts it on PATH. The only non-`vp` invocations are `pnpm install`, `pnpm audit` and `pnpm changeset` / `pnpm publish` on the release path.
+`vp` is the global Vite+ CLI the SessionStart hook installs at the catalog pin (it delegates to the checkout's `node_modules/.bin/vp`); `./node_modules/.bin/vp` works without it. The only non-`vp` invocations are `pnpm install`, `pnpm audit` and `pnpm changeset` / `pnpm publish` on the release path.
 
 ## Verification
 
@@ -65,7 +65,7 @@ Before you report work as done, run the gates below in order and quote each comm
 5. `vp run test:coverage`
 6. `vp run build`
 7. `pnpm audit --audit-level high` (network)
-8. `fallow audit --format json --quiet --explain --gate-marker agent --base origin/trunk` (the fallow gate below; not a CI step), which reads the map step 5 wrote. The verdict must not be `fail`.
+8. `vp exec fallow audit --format json --quiet --explain --gate-marker agent --base origin/trunk` (the fallow gate below; not a CI step), which reads the map step 5 wrote. The verdict must not be `fail`.
 
 Steps 2–7 are CI's `ci` job, in its order ([ci.yml](.github/workflows/ci.yml)).
 
@@ -86,8 +86,8 @@ Never guess at an Effect API: read the installed package. The pinned version is 
 
 ## Agent sessions
 
-- The SessionStart hook (`.claude/hooks/session-start.sh`, registered in `.claude/settings.json`) runs `pnpm install --frozen-lockfile` (through Corepack when available), which also applies the tsgo patch, and puts `vp` (a re-exec shim preferring the nearest checkout's `node_modules`) and `fallow` on PATH. It hydrates no secrets; nothing here needs one.
-- A PreToolUse hook (`.claude/hooks/fallow-gate.sh`) blocks `git commit` / `git push` when `fallow audit --base origin/trunk` fails; it reads the coverage map on disk, so run `vp run test:coverage` first. A PostToolUse hook runs `vp fmt` on every source, JSON, CSS or Markdown file you write or edit.
+- The SessionStart hook (`.claude/hooks/session-start.sh`, registered in `.claude/settings.json`) installs the global Vite+ CLI at the catalog's `vite-plus` pin with the official installer (npm-provenance and SHA-512 checked; it needs `vite.plus` and `viteplus.dev` on the environment's allowlist), links `vp` and `vpx` into `~/.local/bin`, and runs `vp install --frozen-lockfile` (pnpm through Corepack only without the global CLI), which also applies the tsgo patch. It removes the `fallow` shim and the walking `vp` shim earlier versions put there. Everything else goes through Vite+: `vp exec fallow …` for fallow, `vpx <file>.ts` for scripts; the global `vp` delegates to each checkout's own `vite-plus`, worktrees included. If the installer can't run, `vp` falls back to this checkout's `node_modules` copy. It hydrates no secrets; nothing here needs one.
+- A PreToolUse hook (`.claude/hooks/fallow-gate.sh`) blocks `git commit` / `git push` when `fallow audit --base origin/trunk` fails; it reads the coverage map on disk, so run `vp run test:coverage` first. It runs only in this project and its `.claude/worktrees/*` checkouts, with fallow as `vp exec fallow` (the checkout's own pinned copy); from any other tree it skips with a notice and runs none of that tree's tooling. A PostToolUse hook runs `vp fmt` on every source, JSON, CSS or Markdown file you write or edit.
 
 ## Documentation surfaces
 
