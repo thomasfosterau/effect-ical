@@ -4,6 +4,8 @@ Maintained by Thomas Foster, with a workflow meant to be approachable for both h
 
 ## Setup
 
+Open in a Codespace or Dev Container: `.devcontainer/` provisions it with the same hook as agent sessions.
+
 You need Node 22 or later and pnpm 11 (pinned by `packageManager`; `corepack enable` picks it up). npm, npx, bun and yarn are not used anywhere in this repo.
 
 ```sh
