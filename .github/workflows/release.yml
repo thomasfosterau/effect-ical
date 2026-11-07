@@ -1,38 +1,110 @@
 name: Release
 
-# Changesets release for @thomasfosterau/effect-ical: opens the version PR
-# (`chore: version packages`) and, once the owner merges it, publishes with
-# npm trusted publishing (OIDC). The flow, the provenance posture and the
-# owner's one-time setup are in PUBLISHING.md. The default branch is `trunk`,
-# not `main`. Copied from the effect-web library's release workflow.
+# Changesets release flow, split so that only publishing waits for approval.
+# On every push to `trunk`:
 #
-# The job runs in the protected `release` environment, so required reviewers
-# added to it gate every publish.
+# - `select` (read-only) asks changesets/action/select-mode what the repo state
+#   calls for: `version` while unreleased changesets exist, `publish` once none
+#   remain and some package version is not on npm yet (`changeset
+#   publish-plan`), else `none`.
+# - `version` opens/updates the "chore: version packages" PR. It holds a
+#   write-scoped token but no `id-token`, so it cannot publish, and runs outside
+#   the `release` environment, so it needs no approval.
+# - `publish` is the only job in the protected `release` environment and the
+#   only one with `id-token: write`: it publishes to npm via OIDC trusted
+#   publishing and tags the release, after the owner approves it (once per
+#   release). See PUBLISHING.md.
+#
+# changesets/action's README recommends its sub-actions over the combined
+# action for trusted publishing, "to tighten publish permissions"; they need
+# Changesets CLI v3. The version and publish sub-actions push through the
+# GitHub API, so no checkout keeps git credentials.
 
 on:
   push:
     branches: [trunk]
   workflow_dispatch:
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
-
-# No permissions by default; the release job opts into exactly what it needs.
+# No permissions by default; each job opts into exactly what it needs.
 permissions: {}
 
 jobs:
-  release:
+  # Same setup as `publish` (see the comments there), minus the build.
+  select:
+    name: Select mode
+    if: github.repository == 'thomasfosterau/effect-ical' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
+    env: &id001
+      pnpm_config_verify_deps_before_run: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '*'
+          check-latest: true
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Select mode
+        id: mode
+        uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+
+  version:
+    name: Version packages
+    needs: select
+    if: needs.select.outputs.mode == 'version'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: release-version-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      pull-requests: write
+    env: *id001
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '*'
+          check-latest: true
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Create or update the version PR
+        uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          script: pnpm run changeset:version
+          commit-message: "chore: version packages"
+          pr-title: "chore: version packages"
+
+  publish:
     # Never run on forks (they have neither the environment nor the trusted
     # publisher binding, so a fork cannot publish on the owner's behalf).
     # Nor for a Dependabot actor: the job holds `id-token: write` and a
     # write token, and only the owner's merge to `trunk` (or a dispatch)
     # should reach it.
-    if: github.repository == 'thomasfosterau/effect-ical' && github.actor != 'dependabot[bot]'
+    # That guard is on `select` now: this job needs it, so it is skipped with it.
+    needs: select
+    if: needs.select.outputs.mode == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # One publish at a time; never cancel one that has started.
+    concurrency:
+      group: release-publish-${{ github.ref }}
+      cancel-in-progress: false
     environment: release
     permissions:
-      contents: write # push the version branch and tags
-      pull-requests: write # open/update the version PR
+      contents: write # push the release tags and create the GitHub releases
       id-token: write # mint the OIDC token npm exchanges for publish creds
     env:
       # pnpm 11 defaults `verify-deps-before-run` to `install`: before any
@@ -45,11 +117,9 @@ jobs:
       # spelling.
       pnpm_config_verify_deps_before_run: "false"
     steps:
-      # The Changesets action pushes the version branch, so it needs the
-      # checkout's git credentials (the ephemeral, job-scoped GITHUB_TOKEN).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: true
+          persist-credentials: false
       # The pnpm version comes from `packageManager` in package.json. No
       # package cache in the publish job: a cache another workflow wrote must
       # never feed a job that holds `id-token: write` (zizmor's
@@ -78,11 +148,8 @@ jobs:
       # and performs the trusted-publishing (OIDC) exchange itself, so the job
       # installs no npm CLI of its own and holds no NPM_TOKEN.
       - name: Create Release PR or publish
-        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        uses: changesets/action/publish@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          version-script: pnpm run changeset:version
-          publish-script: pnpm run changeset:publish
-          commit-message: "chore: version packages"
-          pr-title: "chore: version packages"
+          script: pnpm run changeset:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

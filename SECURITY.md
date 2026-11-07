@@ -18,7 +18,7 @@ The package is published with a hardened, automated pipeline designed to resist 
 - **Install scripts disabled in the release job.** The release workflow installs with `pnpm install --frozen-lockfile --ignore-scripts` and turns off pnpm 11's `verify-deps-before-run` for that job, so a compromised (transitive) dependency cannot run install hooks in the privileged publish job. CI runs the repo's own `prepare` (the `@effect/tsgo` patch the type gate needs) but only ever holds read permissions.
 - **Pinned actions.** Every GitHub Action is pinned to a full commit SHA, so a hijacked tag cannot inject workflow code.
 - **Least privilege.** Workflows default to `permissions: {}`; each job opts into only the scopes it needs. CI checks out with `persist-credentials: false`.
-- **Manual approval gate.** Publishing runs in a protected `release` environment.
+- **Manual approval gate.** Publishing runs in a protected `release` environment. The Release workflow splits versioning from publishing (changesets/action's `select-mode`, `version` and `publish` sub-actions): only its `publish` job runs in that environment and holds `id-token: write`, so refreshing the version PR needs no approval and cannot publish.
 - **Locked dependencies with a cooling-off period.** Installs use the committed `pnpm-lock.yaml` with `--frozen-lockfile`; `minimumReleaseAge` holds newly published third-party versions for 8 hours before pnpm installs them; Dependabot proposes updates after a 1-day cooldown (its minimum), so never one pnpm would refuse. CI runs `pnpm audit --audit-level high`.
 - **No runtime dependencies** besides the `effect` peer.
 
