@@ -35,7 +35,7 @@ catalog:
   # depends on an exact `effect` release; the singleton override below
   # resolves it onto the catalog `effect`. Successor of
   # `@mpsuesser/oxlint-plugin-effect`, same `effect/` rule namespace.
-  "@enfect/oxlint": ^0.9.0
+  "@enfect/oxlint": ^0.10.0
   # Peer: the content-line scanner (`src/parser.ts`) is an effect-parse
   # grammar compiled with `Compiler.jit`, which 0.2.0 introduced (#7). On the
   # 0.4 line since #47: the sibling libraries (effect-xml, effect-time) peer
