@@ -29,7 +29,7 @@ catalog:
   # any other component version, failing `pnpm install` itself. Read the
   # `components` table in node_modules/@effect/tsgo/dist/effect-tsgo.cjs
   # before bumping any of the three.
-  "@effect/tsgo": 0.63.0
+  "@effect/tsgo": 0.67.5
   # The Effect rule set for Oxlint (`vp lint`, `effect/*` rules, including the
   # anti-slop rules), on top of @effect/tsgo's `recommended` preset. It
   # depends on an exact `effect` release; the singleton override below
@@ -44,7 +44,7 @@ catalog:
   "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles (see `vitest` below);
   # vite-plus refuses to run coverage on a mismatch.
-  "@vitest/coverage-istanbul": 5.0.5
+  "@vitest/coverage-istanbul": 5.1.0
   # `effect` is a peerDependency of the published package and a devDependency
   # here, so the repo resolves exactly one copy while consumers bring their
   # own. Two copies break `Context` / `Layer` / `Schema` identity at runtime.
@@ -69,9 +69,9 @@ catalog:
   # aliased core package, and `vitest` must match vite-plus's exact pin
   # because the `vitest: "catalog:"` override forces every resolution to the
   # catalog singleton. Bump all four together with `@vitest/coverage-istanbul`.
-  vite-plus: 1.4.0
+  vite-plus: 1.5.1
   vite: npm:@voidzero-dev/vite-plus-core@1.4.0
-  vitest: 5.0.5
+  vitest: 5.1.0
 
 # Peer ranges the PUBLISHED package declares. Kept as a named catalog so the
 # strict catalog mode still governs them while they stay ranges (an exact
