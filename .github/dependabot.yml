@@ -1,7 +1,7 @@
 # Dependabot version updates for the npm dependencies (pnpm maintains
 # `pnpm-lock.yaml`; Dependabot regenerates it in the same PR as the bump) and
-# the SHA-pinned GitHub Actions (Dependabot keeps the SHA and its `# vX.Y.Z`
-# comment current together).
+# the GitHub Actions, referenced by exact `@vX.Y.Z` tags and locked to their
+# commits in .github/workflows/actions.lock (Dependabot keeps the tags current).
 #
 # `groups` exist only for dependencies that MUST move together (one release
 # train with exact cross-pins, or a hard compatibility table). Everything
