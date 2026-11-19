@@ -1,27 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-  "entry": [
-    "src/index.ts",
-    "tests/**/*.test.ts",
-    "tests/**/*.types.ts",
-    "examples/*.ts",
-    "vite.config.ts"
-  ],
-  "ignorePatterns": ["**/dist/**", "**/coverage/**"],
-  "ignoreDependencies": [
-    "@types/node",
-    "@effect/tsgo",
-    "@effect/language-service",
-    "@typescript/native",
-    "typescript",
-    "vite",
-    "vitest",
-    "vite-plus",
-    "@changesets/cli",
-    "@vitest/coverage-istanbul",
-    "@enfect/oxlint",
-    "fallow"
-  ],
+  "entry": ["tests/**/*.test.ts", "tests/**/*.types.ts", "examples/*.ts", "vite.config.ts"],
+  "ignoreDependencies": ["@effect/language-service"],
   "rules": {
     "unused-files": "error",
     "unused-exports": "error",
