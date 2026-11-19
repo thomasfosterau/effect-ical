@@ -10,9 +10,6 @@
  * @module
  */
 
-// The barrel re-exports this module only as a namespace (`export * as Calendar`),
-// so its setter and `encode` names never collide with a sibling module's.
-// fallow-ignore-file duplicate-export
 import * as Compiler from "@thomasfosterau/effect-parse/Compiler";
 import * as Parser from "@thomasfosterau/effect-parse/Parser";
 import * as Token from "@thomasfosterau/effect-parse/Token";
