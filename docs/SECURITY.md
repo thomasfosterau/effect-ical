@@ -12,5 +12,5 @@ The library parses untrusted text: input that makes the parser crash, hang, over
 
 - Releases use npm trusted publishing; there is no long-lived npm token.
 - The release jobs install with `--ignore-scripts`. Workflows default to `permissions: {}`, never persist checkout credentials, and pin actions by `.github/workflows/actions.lock`.
-- `minimumReleaseAge` holds new third-party versions for 8 hours; Dependabot waits 1 day. CI runs `pnpm audit --audit-level high`.
+- `minimumReleaseAge` holds new third-party versions for 24 hours; Dependabot waits 1 day. CI runs `pnpm audit --audit-level high`.
 - No runtime dependencies besides the peers.

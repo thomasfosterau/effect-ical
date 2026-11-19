@@ -56,6 +56,6 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: false
 
-minimumReleaseAge: 480
+minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - "@thomasfosterau/*"
