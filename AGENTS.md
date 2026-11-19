@@ -19,4 +19,4 @@ Read [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) fir
 
 ## Fallow
 
-Before a commit or push, run `vp run test:coverage`, then `vp exec fallow audit --base origin/trunk --format json --quiet --explain --gate-marker agent` (Claude Code's hook does this too). On a `fail` verdict, fix the findings the change introduced; treat a `{ "error": true }` result as non-blocking. Useful commands: `fallow dead-code --trace <file>:<export>`, `fallow explain <issue-type>`.
+The pre-commit hook runs `vp run fallow:audit`; fix the findings your change introduces. Useful commands: `vp exec fallow dead-code --trace <file>:<export>`, `vp exec fallow explain <issue-type>`.

@@ -2,7 +2,7 @@
 
 Read README.md, docs/CONTRIBUTING.md and AGENTS.md (imported below). This file covers only Claude Code specifics.
 
-- **Hooks** (`.claude/settings.json`): PreToolUse runs `vp exec fallow audit --base origin/trunk` from the project directory before any `git commit` / `git push` and blocks on a `fail` verdict. It reads the coverage map on disk, so run `vp run test:coverage` first. PostToolUse runs `vp fmt --write` on each edited file.
+- **Hooks** (`.claude/settings.json`): PostToolUse runs `vp fmt --write` on each edited file. The fallow gate is a git pre-commit hook (see docs/CONTRIBUTING.md).
 - **Worktrees** go under `.claude/worktrees/`, one per branch; run `vp install` in each.
 
 @../README.md

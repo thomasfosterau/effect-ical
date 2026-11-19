@@ -8,7 +8,7 @@
 
 ## Toolchain
 
-[Vite+](https://viteplus.dev) (`vp`) manages Node and pnpm and runs every task. `vp install` installs dependencies, the git hooks (pre-commit runs `vp staged`: format and lint on staged files) and, through `prepare`, the Effect-patched `tsc` and oxlint.
+[Vite+](https://viteplus.dev) (`vp`) manages Node and pnpm and runs every task. `vp install` installs dependencies, the git hooks (pre-commit runs `vp staged`, then `vp run fallow:audit`) and, through `prepare`, the Effect-patched `tsc` and oxlint.
 
 | Command | What it does |
 | --- | --- |
@@ -18,7 +18,7 @@
 | `vp run test:coverage` | Tests with coverage thresholds; writes the map `fallow audit` reads |
 | `vp run build` | `vp pack` → `dist/` |
 | `vp run ci` | Everything CI runs, in order (`pnpm audit` needs the network) |
-| `vp exec fallow audit --base origin/trunk` | Dead code, duplication and complexity in your change |
+| `vp run fallow:audit` | Fallow on your change (dead code, duplication, complexity); the pre-commit hook runs it |
 
 Fallow is a guide, not dogma: use it to polish your work, but some duplication or complexity is fine. Every external version lives in the `pnpm-workspace.yaml` catalog; never edit one in `package.json`.
 
@@ -34,10 +34,10 @@ Fallow is a guide, not dogma: use it to polish your work, but some duplication o
 
 ## Before pushing
 
-Run `vp run ci` (or each of `vp check`, `vp run check`, `vp run test:coverage`, `vp run build`), and `vp exec fallow audit --base origin/trunk` after `vp run test:coverage`.
+Run `vp run ci` (or each of `vp check`, `vp run check`, `vp run test:coverage`, `vp run build`). The pre-commit hook runs `vp staged` (format and lint) and then `vp run fallow:audit`, which blocks the commit on findings the change introduces.
 
 CI ([ci.yml](../.github/workflows/ci.yml)) runs `vp run ci` with no secrets. Workflows pin actions by exact tag, locked to commits by `.github/workflows/actions.lock`: run `gh actions-lock` after changing a `uses:`. `uvx zizmor --offline .github` audits the workflows.
 
 ## Changesets
 
-Every change to the published package's behaviour or its `.d.ts` (doc comments included, as a `patch`) needs a changeset: `pnpm changeset`. Docs-, CI- and tooling-only changes need none. Never version or publish by hand: the Release workflow opens the `chore: version packages` PR, and merging it publishes. See [PUBLISHING.md](PUBLISHING.md).
+Every change to the published package's behaviour or its `.d.ts` (doc comments included, as a `patch`) needs a changeset: `vp exec changeset`. Docs-, CI- and tooling-only changes need none. Never version or publish by hand: the Release workflow opens the `chore: version packages` PR, and merging it publishes. See [PUBLISHING.md](PUBLISHING.md).

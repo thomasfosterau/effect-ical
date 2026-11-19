@@ -96,6 +96,21 @@ export default defineConfig({
           "vp check && vp run check && vp run test:coverage && vp run build && pnpm audit --audit-level high",
         cache: false,
       },
+      // Run by the pre-commit hook; reads the coverage map.
+      "fallow:audit": {
+        command: "vp exec fallow audit --base origin/trunk --quiet",
+        dependsOn: ["test:coverage"],
+        cache: false,
+      },
+      "changeset:version": {
+        command: "changeset version && vp fmt",
+        cache: false,
+      },
+      "changeset:publish": {
+        command: "changeset publish",
+        dependsOn: ["build"],
+        cache: false,
+      },
       // Effect-patched native tsc over `src`, then `src` + `tests` + `examples`.
       check: {
         command: "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
