@@ -28,9 +28,10 @@
   },
   "files": [
     "dist",
+    "docs/api.md",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -42,18 +43,33 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./Calendar": {
+      "types": "./dist/Calendar.d.ts",
+      "import": "./dist/Calendar.js"
+    },
+    "./ContentLine": {
+      "types": "./dist/ContentLine.d.ts",
+      "import": "./dist/ContentLine.js"
+    },
+    "./Event": {
+      "types": "./dist/Event.d.ts",
+      "import": "./dist/Event.js"
+    },
+    "./Todo": {
+      "types": "./dist/Todo.d.ts",
+      "import": "./dist/Todo.js"
+    },
+    "./VCard": {
+      "types": "./dist/VCard.d.ts",
+      "import": "./dist/VCard.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "prepare": "vp config && effect-tsgo patch --typescript --oxlint",
-    "fallow": "fallow --summary",
-    "fallow:audit": "fallow audit",
-    "changeset": "changeset",
-    "changeset:version": "changeset version && vp fmt",
-    "changeset:publish": "vp run build && changeset publish"
+    "prepare": "vp config && effect-tsgo patch --typescript --oxlint"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
@@ -75,9 +91,14 @@
     "@thomasfosterau/effect-parse": "catalog:peers",
     "effect": "catalog:peers"
   },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "lts"
+    }
+  },
   "engines": {
-    "node": ">=22",
-    "pnpm": ">=11"
+    "node": ">=22"
   },
   "packageManager": "pnpm@11.28.6"
 }

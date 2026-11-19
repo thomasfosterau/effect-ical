@@ -11,14 +11,11 @@
  * kept in order in `extra` and written back, so a parse → encode
  * round-trip loses nothing.
  *
- * Only `VERSION:4.0` cards are read; vCard 3.0 and 2.1 are #27.
+ * Only `VERSION:4.0` cards are read.
  *
  * @module
  */
 
-// The barrel re-exports this module only as a namespace (`export * as VCard`),
-// so its `parse` and `encode` names never collide with a sibling module's.
-// fallow-ignore-file duplicate-export
 import * as Ascii from "@thomasfosterau/effect-parse/Ascii";
 import * as Compiler from "@thomasfosterau/effect-parse/Compiler";
 import * as Parser from "@thomasfosterau/effect-parse/Parser";

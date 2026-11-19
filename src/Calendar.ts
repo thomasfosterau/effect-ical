@@ -10,9 +10,6 @@
  * @module
  */
 
-// The barrel re-exports this module only as a namespace (`export * as Calendar`),
-// so its setter and `encode` names never collide with a sibling module's.
-// fallow-ignore-file duplicate-export
 import * as Compiler from "@thomasfosterau/effect-parse/Compiler";
 import * as Parser from "@thomasfosterau/effect-parse/Parser";
 import * as Token from "@thomasfosterau/effect-parse/Token";
@@ -278,7 +275,7 @@ export const decode = (icalString: string): Effect.Effect<Calendar, ParseError> 
       return Effect.fail(new ParseError({ message: "VERSION must be 2.0" }));
     }
     // Decoding (not `new Calendar`) because CALSCALE is read as free text: a
-    // value other than GREGORIAN is a defect, as it always has been.
+    // value other than GREGORIAN is a defect.
     return Effect.orDie(
       Schema.decodeUnknownEffect(Calendar)({
         component: "VCALENDAR",

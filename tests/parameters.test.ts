@@ -1,6 +1,6 @@
 /**
  * Property parameters of typed fields are kept in `parameters` and written
- * back by the encoder (#22).
+ * back by the encoder.
  */
 
 import * as Result from "effect/Result";
@@ -36,7 +36,7 @@ const text = calendar(
   "END:VEVENT",
 );
 
-describe("parameters (#22)", () => {
+describe("parameters", () => {
   it("keeps each typed field's parameters, one list per line", () => {
     const event = parsed(text).events?.[0];
     expect(event?.dtstart).toBe("20240115T100000");

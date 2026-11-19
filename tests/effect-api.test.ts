@@ -1,7 +1,3 @@
-/**
- * Tests for the Effect-style API
- */
-
 import { describe, it, expect } from "vite-plus/test";
 import { pipe } from "effect/Function";
 import * as Schema from "effect/Schema";
@@ -295,7 +291,7 @@ describe("Event.encode and Todo.encode", () => {
   });
 });
 
-describe("setters return Schema class instances (#5)", () => {
+describe("setters return Schema class instances", () => {
   it("keeps every Event setter's result an Event", () => {
     const original = Event.make("20240101T120000Z");
     const event = pipe(

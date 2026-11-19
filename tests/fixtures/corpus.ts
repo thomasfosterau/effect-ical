@@ -1,44 +1,9 @@
 /**
  * Characterisation corpus: inputs covering every documented behaviour of the
- * parser, the encoder, the fluent builders and the pipeable `Calendar` /
- * `Event` / `Todo` modules, including the edge cases (malformed lines,
- * unclosed components, numeric coercion, line folding of multi-byte text).
- *
- * `corpus.golden.json` holds what the implementation produced for every
- * input here before the Effect 4 / lint-plugin migration, generated from the
- * Effect 3 sources; `tests/characterisation.test.ts` asserts the current
- * implementation still produces exactly that. Add a case here only together
- * with its golden output, and never regenerate the golden file to make a
- * behaviour change pass.
- *
- * Deliberate changes are recorded in the golden file by hand:
- *
- * - The Effect 3 `Calendar.decode` failed with a bare `Error` (tag
- *   `"Error"`); it now fails with the tagged `ParseError`, with the same
- *   messages.
- * - #23: the parser unescapes TEXT values and splits each `CATEGORIES` line
- *   at its unescaped commas, so `parse(encode(x))` round-trips. In
- *   `parse.everyComponent`, the summary `Event\, escaped` became
- *   `Event, escaped`, and the categories `WORK,MEETING` became `WORK` and
- *   `MEETING`.
- * - #22: the parser keeps the parameters of typed fields in each component's
- *   `parameters`. The only golden change is that `parse.everyComponent`'s
- *   event gained `parameters` (`DTSTART`'s `TZID`, the first `ATTENDEE`'s
- *   `CN` and `ROLE`, and an empty list for the second attendee); every
- *   existing key is unchanged.
- * - #24: untyped properties are kept as read in each component's `extra`,
- *   and sub-components of a type the model does not hold there in its
- *   `components`. Golden entries gained only those keys: in
- *   `parse.everyComponent` the calendar's `X-WR-CALNAME` and `X-CUSTOM`,
- *   the event's `SEQUENCE` and `GEO`, and the free/busy's `FREEBUSY`;
- *   `unclosedEvent` and `unclosedEventThenInvalid` the leaked lines on the
- *   calendar; `mismatchedEnd` the event's `END:VCALENDAR`; `emptyBegin` the
- *   empty-named component; and `nestedCalendar` the inner `VCALENDAR`.
- *   Every existing key, the lower-cased untyped fields included, is
- *   unchanged.
- *
- * The only seam is how an Effect is run (`Run`); the golden file was produced
- * by running this corpus against the Effect 3 sources.
+ * parser, the encoder, the builders and the pipeable modules, edge cases
+ * included. `tests/characterisation.test.ts` checks each against
+ * `corpus.golden.json`. Add a case only together with its golden output;
+ * record a deliberate behaviour change by editing that entry by hand.
  *
  * @module
  */

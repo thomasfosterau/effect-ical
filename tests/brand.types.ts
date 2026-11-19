@@ -1,5 +1,5 @@
 /**
- * Compile-time assertions for the branded Schema classes (#9): a structurally
+ * Compile-time assertions for the branded Schema classes: a structurally
  * compatible plain object is not an `Event`, `Todo`, `Calendar` or error
  * instance, so instances come only from `make`, the setters, the constructors
  * or decoding. Type-checked by `vp run check` (`tsconfig.test.json`), never run.

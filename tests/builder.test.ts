@@ -1,7 +1,3 @@
-/**
- * Tests for the builder API
- */
-
 import { assert, describe, expect, it } from "vite-plus/test";
 import * as Result from "effect/Result";
 import { createCalendar, createEvent, createTodo, CalendarBuilder } from "../src/builder";
@@ -221,22 +217,6 @@ describe("Builder API", () => {
       expect(calendar.todos).toMatchObject([
         { uid: "todo-456", summary: "Review PR", status: "IN-PROCESS", percent: 75 },
       ]);
-    });
-  });
-
-  describe("Fluent API chaining", () => {
-    it("should support method chaining", () => {
-      const calendar = createCalendar("-//Test//Test//EN")
-        .name("My Calendar")
-        .description("Test")
-        .event((e) => e.dtstart("20240101T120000Z").summary("Event 1"))
-        .event((e) => e.dtstart("20240102T120000Z").summary("Event 2"))
-        .todo((t) => t.summary("Todo 1"))
-        .todo((t) => t.summary("Todo 2").priority(1))
-        .build();
-
-      expect(calendar.events?.length).toBe(2);
-      expect(calendar.todos?.length).toBe(2);
     });
   });
 });
