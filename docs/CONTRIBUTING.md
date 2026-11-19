@@ -35,6 +35,8 @@ Fallow is a guide, not dogma: use it to polish your work, but some duplication o
 
 Run `vp run ci` (or each of `vp check`, `vp run check`, `vp run test:coverage`, `vp run build`), and `vp exec fallow audit --base origin/trunk` after `vp run test:coverage`.
 
+CI ([ci.yml](../.github/workflows/ci.yml)) runs `vp run ci` with no secrets. Workflows pin actions by exact tag, locked to commits by `.github/workflows/actions.lock`: run `gh actions-lock` after changing a `uses:`. `uvx zizmor --offline .github` audits the workflows.
+
 ## Changesets
 
 Every change to the published package's behaviour or its `.d.ts` (doc comments included, as a `patch`) needs a changeset: `pnpm changeset`. Docs-, CI- and tooling-only changes need none. Never version or publish by hand: the Release workflow opens the `chore: version packages` PR, and merging it publishes. See [PUBLISHING.md](PUBLISHING.md).
