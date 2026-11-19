@@ -6,6 +6,7 @@ Read [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) fir
 
 - You may open pull requests in this repository (GitHub MCP tools or `gh`, whichever is available). GitHub writes go to `thomasfosterau/effect-ical` only.
 - When you spot work outside your task, file an issue and move on.
+- Write idiomatic Effect (see docs/CONTRIBUTING.md). Non-idiomatic code you find: fix it if trivial, otherwise file an issue naming the sites and the idiomatic replacement.
 - Before reporting work as done, run the gates in docs/CONTRIBUTING.md and say which passed and which couldn't run.
 
 ## Pitfalls

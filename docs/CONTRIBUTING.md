@@ -24,7 +24,8 @@ Fallow is a guide, not dogma: use it to polish your work, but some duplication o
 
 ## Coding guidelines
 
-- Use Effect 4 idioms and read the installed `effect` package (`node_modules/effect`) rather than guessing at an API. Parsing and encoding are pure `Result` functions; the Effect API wraps them. Errors are `Schema.TaggedError` classes. Import Effect modules as namespaces (`import * as Arr from "effect/Array"`), never from the barrel.
+- Use Effect idioms throughout, and strongly prefer Effect v4's own modules (`Array`, `Option`, `Result`, `Match`, `Schema`, …) over hand-rolled equivalents; convert existing code where practical. Exceptions: non-Effect APIs adapted at the edge, and hot paths where measured performance needs plain code. File an issue for non-idiomatic code you find rather than leaving it.
+- Read the installed `effect` package (`node_modules/effect`) rather than guessing at an API. Parsing and encoding are pure `Result` functions; the Effect API wraps them. Errors are `Schema.TaggedError` classes. Import Effect modules as namespaces (`import * as Arr from "effect/Array"`), never from the barrel.
 - `exactOptionalPropertyTypes` is on: optional members are `?: T`, and objects are built without explicit-`undefined` keys.
 - Fix lint findings in code; a rule is relaxed only in `vite.config.ts`, with its reason.
 - Comments: a short file header only where it adds context; doc comments on exports where they add to IntelliSense (description first, then tags); inline comments only for the non-obvious. No references to issues, PRs or history.
