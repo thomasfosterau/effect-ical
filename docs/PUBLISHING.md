@@ -10,7 +10,7 @@
 
 Don't add `--provenance`: the repository is private, and an explicit provenance request fails the publish.
 
-The release jobs install with `--ignore-scripts` and set `pnpm_config_verify_deps_before_run: "false"`, so no dependency script runs in a job holding `id-token: write`. They run no checks; CI already gates every PR and push.
+The release jobs install with `--ignore-scripts` and set `pnpm_config_verify_deps_before_run: "false"`, so no dependency script runs in a job holding `id-token: write`. They run no checks; CI already gates every PR and push. Nothing publishes unless `.github/workflows/actions.lock` verifies, and the release jobs use no cache.
 
 ## One-time owner setup
 

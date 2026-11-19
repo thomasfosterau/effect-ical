@@ -136,7 +136,14 @@ export default defineConfig({
     },
   },
   pack: {
-    entry: { index: "src/index.ts" },
+    entry: {
+      index: "src/index.ts",
+      Calendar: "src/Calendar.ts",
+      ContentLine: "src/ContentLine.ts",
+      Event: "src/Event.ts",
+      Todo: "src/Todo.ts",
+      VCard: "src/VCard.ts",
+    },
     format: "esm",
     platform: "neutral",
     target: "esnext",

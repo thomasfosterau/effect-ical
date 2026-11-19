@@ -43,6 +43,26 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./Calendar": {
+      "types": "./dist/Calendar.d.ts",
+      "import": "./dist/Calendar.js"
+    },
+    "./ContentLine": {
+      "types": "./dist/ContentLine.d.ts",
+      "import": "./dist/ContentLine.js"
+    },
+    "./Event": {
+      "types": "./dist/Event.d.ts",
+      "import": "./dist/Event.js"
+    },
+    "./Todo": {
+      "types": "./dist/Todo.d.ts",
+      "import": "./dist/Todo.js"
+    },
+    "./VCard": {
+      "types": "./dist/VCard.d.ts",
+      "import": "./dist/VCard.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {

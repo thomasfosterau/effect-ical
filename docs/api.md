@@ -188,7 +188,7 @@ Every property instance is a `Property<A>`: `{ value, parameters?, group? }`. Fi
 - URIs, dates and other values (`TEL`, `URL`, `PHOTO`, `BDAY`, `TZ`, `UID`, …) are verbatim strings.
 - Nothing is lost: properties the model does not type (`X-…`, `item1.X-ABLabel`), a second `UID`, and an `N` or `ADR` with too many components are kept in `extra` in their order and written back.
 
-vCard 3.0 and 2.1 are not read yet ([#27](https://github.com/thomasfosterau/effect-ical/issues/27)).
+vCard 3.0 and 2.1 are not read yet.
 
 ```ts
 import { VCard } from "@thomasfosterau/effect-ical";
