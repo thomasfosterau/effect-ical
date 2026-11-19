@@ -278,7 +278,7 @@ export const decode = (icalString: string): Effect.Effect<Calendar, ParseError> 
       return Effect.fail(new ParseError({ message: "VERSION must be 2.0" }));
     }
     // Decoding (not `new Calendar`) because CALSCALE is read as free text: a
-    // value other than GREGORIAN is a defect, as it always has been.
+    // value other than GREGORIAN is a defect.
     return Effect.orDie(
       Schema.decodeUnknownEffect(Calendar)({
         component: "VCALENDAR",

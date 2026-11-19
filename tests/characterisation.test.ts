@@ -1,7 +1,6 @@
 /**
- * Pins the library's observable behaviour to `fixtures/corpus.golden.json`:
- * what the Effect 3 implementation produced for every input in
- * `fixtures/corpus.ts`, before the Effect 4 / lint-plugin migration.
+ * Pins the library's observable behaviour to `fixtures/corpus.golden.json`
+ * for every input in `fixtures/corpus.ts`.
  */
 
 import * as R from "effect/Record";

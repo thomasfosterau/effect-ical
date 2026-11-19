@@ -11,7 +11,7 @@
  * kept in order in `extra` and written back, so a parse → encode
  * round-trip loses nothing.
  *
- * Only `VERSION:4.0` cards are read; vCard 3.0 and 2.1 are #27.
+ * Only `VERSION:4.0` cards are read.
  *
  * @module
  */

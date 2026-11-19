@@ -1,5 +1,5 @@
 /**
- * Lossless round-trip (#24): untyped properties are kept in `extra` and
+ * Lossless round-trip: untyped properties are kept in `extra` and
  * unknown sub-components in `components`, so encoding a parsed calendar
  * writes back every line it read.
  */
@@ -148,7 +148,7 @@ const realWorld = [
   "",
 ].join("\r\n");
 
-describe("lossless round-trip (#24)", () => {
+describe("lossless round-trip", () => {
   it("writes back every line of a real-world calendar", () => {
     expect(canonical(encodeSync(parsed(realWorld)))).toEqual(canonical(realWorld));
   });

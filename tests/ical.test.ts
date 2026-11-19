@@ -1,7 +1,3 @@
-/**
- * Tests for the iCalendar encoder and parser
- */
-
 import { assert, describe, expect, it } from "vite-plus/test";
 import * as Result from "effect/Result";
 import { parseResult } from "../src/parser";
@@ -144,7 +140,7 @@ END:VCALENDAR
     expect(Result.isFailure(parseResult(ical))).toBe(true);
   });
 
-  it("locates a line without a colon (#7)", () => {
+  it("locates a line without a colon", () => {
     const ical =
       "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nSUMMARY:a\r\n  folded\r\nno colon here\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
     const result = parseResult(ical);
@@ -158,7 +154,7 @@ END:VCALENDAR
     expect(result.failure.column).toBe(1);
   });
 
-  it("locates an unclosed component at its BEGIN line (#7)", () => {
+  it("locates an unclosed component at its BEGIN line", () => {
     const ical = "junk\nBEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Test//EN\n";
     const result = parseResult(ical);
     assert(Result.isFailure(result));
@@ -167,14 +163,14 @@ END:VCALENDAR
     expect(result.failure.column).toBe(1);
   });
 
-  it("leaves errors that belong to no line unlocated (#7)", () => {
+  it("leaves errors that belong to no line unlocated", () => {
     const result = parseResult("no calendar here");
     assert(Result.isFailure(result));
     expect(result.failure.line).toBeUndefined();
     expect(result.failure.column).toBeUndefined();
   });
 
-  it("keeps a lone CR as line content and drops empty lines (#7)", () => {
+  it("keeps a lone CR as line content and drops empty lines", () => {
     const ical =
       "\r\n\nBEGIN:VCALENDAR\nVERSION:2.0\r\n\r\n\nPRODID:a\rb\nNAME:x\n\n\ty\r\nEND:VCALENDAR";
     const result = parseResult(ical);
@@ -418,7 +414,7 @@ const roundTrip = (calendar: VCalendar): VCalendar => {
   return result.success;
 };
 
-describe("TEXT round-trip (#23)", () => {
+describe("TEXT round-trip", () => {
   it("unescapes TEXT values the encoder escaped", () => {
     const tricky = "Lunch; then 1:1, at C:\\Temp\nBring notes";
     const calendar: VCalendar = {
