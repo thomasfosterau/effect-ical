@@ -1,113 +1,21 @@
 # AGENTS.md
 
-`CLAUDE.md` is a symlink to this file. This repo publishes one package, `@thomasfosterau/effect-ical`: iCalendar (RFC 5545) encoding and decoding for Effect. The package lives at the repo root (no workspace packages).
+Read [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) first; this file adds only what is specific to agents.
 
-**Toolchain:** the Vite+ library standard the sibling libraries share, copied from effect-web: `vp` runs every task, `vp check` is the format (Oxfmt) and lint (Oxlint with the Effect preset) gate, `vp pack` (tsdown) builds, tests import from `vite-plus/test`, and the fallow gate runs before every agent commit and push.
+## Process
 
-| Package | Directory | Purpose · peers |
-| --- | --- | --- |
-| `@thomasfosterau/effect-ical` | `.` (`src/`) | Parse, encode and build iCalendar data: a plain object model (`VCalendar`, …) with `parse` / `encode`, fluent builders, and pipeable `Calendar` / `Event` / `Todo` Schema-class modules · `effect` |
+- You may open pull requests in this repository (GitHub MCP tools or `gh`, whichever is available). GitHub writes go to `thomasfosterau/effect-ical` only.
+- When you spot work outside your task, file an issue and move on.
+- Before reporting work as done, run the gates in docs/CONTRIBUTING.md and say which passed and which couldn't run.
 
-`src/` modules and their boundaries:
+## Pitfalls
 
-- `types.ts`: the plain object model (`VCalendar`, `VEvent`, `VTodo`, `VJournal`, `VFreeBusy`, `VTimezone`, `VAlarm`). Types only.
-- `ContentLine.ts`: the content-line syntax iCalendar shares with vCard (`unfold`, `parse` / `parseAll`, `format` / `fold`, parameters with RFC 6868 encoding, TEXT escaping and splitting), exported as a namespace. Pure; no component knowledge.
-- `properties.ts`: internal (not re-exported) table the parser and encoder share: field names, repeatable properties, and which properties each component types.
-- `parser.ts`: text → `VCalendar` (`parseResult`, `parse`, `ParseError`). Pure; lines are read with `ContentLine.parse` (falling back to a split at the first `:`), typed fields' parameters go to `parameters`, TEXT values are unescaped, everything else is kept verbatim (no date decoding).
-- `encoder.ts`: `VCalendar` → text (`encodeResult`, `encode`, `encodeSync`, `EncodeError`). Pure; writes `parameters` back, escapes TEXT values, folds at 75 octets, CRLF.
-- `builder.ts`: mutable fluent builders over the object model (`createCalendar`, `createEvent`, `createTodo`, `BuildError`).
-- `VCard.ts`: the vCard 4.0 (RFC 6350) model, parser and encoder on `ContentLine`, exported as a namespace. Lossless: untyped properties stay in `extra`. Pure.
-- `Calendar.ts`, `Event.ts`, `Todo.ts`: Schema classes with pipeable setters, re-exported from `index.ts` as namespaces (`export * as Event`). `Calendar.encode` / `Calendar.decode` are a compact rendering and a shallow reader, not the full codec: see their doc comments.
+- **The golden file is the behaviour contract.** See docs/CONTRIBUTING.md; never regenerate `tests/fixtures/corpus.golden.json` wholesale.
+- **The parser's quirks are deliberate.** A failed (e.g. unclosed) child component is skipped and its lines re-scanned as the parent's own; an `END:X` that does not match the open component is kept as a property; non-integer numeric properties stay text.
+- **No loops or recursion over lines.** The line scanner is `Arr.unfold` (linear, stack-safe); recursion happens only per nesting level, so very large calendars still parse.
+- **`effect-tsgo patch` is version-locked.** `@effect/tsgo`, `@typescript/native` and `vite-plus` move together, or `vp install` fails; read the catalog comments first.
+- **`sideEffects: false`**: no top-level statements in `src/`.
 
-## Common pitfalls
+## Fallow
 
-- **Behaviour is pinned by a golden file.** `tests/characterisation.test.ts` asserts the output of every input in `tests/fixtures/corpus.ts` against `tests/fixtures/corpus.golden.json`, generated from the pre-migration (Effect 3) sources. A failure there is a behaviour change: fix the code, or, for a deliberate change, edit that golden entry by hand, say why in `corpus.ts`'s header and add a changeset. Never regenerate the whole file to get green.
-- **The parser's quirks are part of its contract.** A failed (e.g. unclosed) child component is skipped and its lines re-scanned as the parent's own; an `END:X` that does not match the open component is kept as a property; numeric properties that are not integers stay text. The corpus covers each.
-- **No loops, no recursion over lines.** The line scanner is `Arr.unfold` (linear, stack-safe); recursion happens only per nesting level. A calendar with tens of thousands of lines must still parse.
-- **`effect` is a singleton.** The package declares it as a peer (`catalog:peers`, `^4.0.0`: raise it only when a dependency or required peer requires a newer `effect`, naming that dependency in the catalog comment; `@thomasfosterau/effect-parse` 0.4.1 peers on `^4.0.0`), takes it as a `catalog:` devDependency, and `overrides: { effect: "catalog:" }` forces one copy.
-- **`@effect/tsgo`, `@typescript/native`, `typescript` and `vite-plus` bump together.** `effect-tsgo patch --typescript --oxlint` (the `prepare` script) supports an explicit set of TypeScript and oxlint versions and fails `pnpm install` on any other; `vite-plus` pins its `oxlint`, `oxfmt` and `vitest`, so `vite`, `vitest` and `@vitest/coverage-istanbul` follow it. Read the catalog comments before bumping any of them.
-- **Strict catalog.** Every external version lives in `pnpm-workspace.yaml` (`catalogMode: strict`); `package.json` carries only `catalog:` and `catalog:peers`. After editing the catalog, run `pnpm install` and commit `pnpm-lock.yaml`, or CI fails at `pnpm install --frozen-lockfile`.
-- **`minimumReleaseAge`** holds a newly published version for 8 hours (480 minutes) before `pnpm install` takes it; Dependabot's `cooldown` is 1 day (it takes whole days only), so it never proposes a version pnpm would still refuse. `@thomasfosterau/*` is exempt from both.
-- **Dependabot groups only the lockstep sets** (`.github/dependabot.yml`: `toolchain` — vite-plus, vitest, `@vitest/*`, `@effect/tsgo` — and `effect` — `effect` + `@effect/*`); everything else, `@enfect/oxlint`, `fallow`, `@changesets/*` and each GitHub Action included, comes as its own PR. By hand, on the toolchain PR's branch: the npm-alias catalog entries (`vite` → `@voidzero-dev/vite-plus-core`, equal to `vite-plus`; `typescript` → `@typescript/typescript6`; `@typescript/native` → `typescript`, matching `@effect/tsgo`'s `components` table) and an `@effect/tsgo` release that supports the new oxlint / tsgolint.
-- **Node and pnpm only.** No npm, npx, bun or yarn in scripts, hooks, workflows or docs. CI and Release set up Node as `node-version: "*"` with `check-latest: true`, never `latest` (which resolves to nodejs.org's newest entry, pre-releases included).
-
-## Conventions
-
-- **`exactOptionalPropertyTypes` is on.** The object model's optional members are `?: T` (no `| undefined`, which the `prefer-option-over-null` lint rule flags); build objects without explicit-`undefined` keys.
-- **Pure core, Effect wrapper.** Parsing and encoding are `Result`-returning functions (`parseResult`, `encodeResult`); the Effect API wraps them with `Effect.suspend(() => Effect.fromResult(…))`, so the work runs when the Effect runs. Never call `Effect.runSync` in `src/`.
-- **Errors are `Schema.TaggedError` classes** with a `message` field: `ParseError`, `EncodeError`, `BuildError`.
-- **Imports:** namespace imports per module (`import * as Arr from "effect/Array"`), never the `effect` barrel.
-- **Doc comments put the description first**, then tags (`@module`, `@category`, `@example`). Hovers show only the text before the first tag. Every exported symbol has one whose first sentence stands alone.
-- **Format and lint:** `vp check` runs Oxfmt and Oxlint (config in `vite.config.ts`: `@effect/tsgo`'s `recommended` preset plus `@enfect/oxlint`'s, with Oxlint's `correctness`, `suspicious` and `perf` categories over the `typescript`, `unicorn`, `oxc`, `import`, `promise`, `vitest` and `jsdoc` plugins, type-aware rules on). There are no ported-code allowances: every `effect/*` rule is at `error`, including `casting-awareness` and `prefer-namespace-imports` (so `effect/Record` is imported as `R` and `effect/Predicate` as `P`); each relaxed non-Effect rule carries its reason in `vite.config.ts`. The one `effect/*` override is `effect-run-in-body`, off only for `tests/helpers/effect.ts` (the test harness) and `examples/*.ts` (entrypoints). `vite.config.ts` reads no `process.env`: Vitest takes `VITEST_MAX_WORKERS` itself.
-- **Tests:** `vite-plus/test` (never `vitest`; the `vite-plus/prefer-vite-plus-imports` rule enforces it). Run Effects only through `tests/helpers/effect.ts`. `tests/examples.test.ts` runs every example. Coverage thresholds (90 / 85 / 90 / 90 on `src/**`, effect-web's) fail `vp run test:coverage`; never lower them, add tests.
-- **Builds:** `vp pack` → `dist/index.js` + `dist/index.d.ts`, ESM only, `effect/*` external, `sideEffects: false` (no top-level statements).
-
-## Commands
-
-- `pnpm install`: dependencies (pnpm 11, pinned by `packageManager`), the Vite+ git hooks (`vp config`; pre-commit runs `vp staged`: format + lint on staged files) and the `prepare` step that patches the native `tsc` and `oxlint` with `@effect/tsgo`. No pre-push hook: run the gates yourself.
-- `vp check`: format + lint; lint is type-aware through `oxlint-tsgolint` (bundled with Vite+, patched by `@effect/tsgo`), with `typeCheck` off because `vp run check` is the type gate. `vp check --fix` applies fixes. `vp run check`: the type gate (native TS7 `tsc` over `tsconfig.json`, then `tsconfig.test.json`, which adds `tests` and `examples`). They are different commands.
-- `vp run test:unit`: the unit suite.
-- `vp run test:coverage`: the suite under Istanbul, failing below the thresholds; writes `coverage/coverage-final.json`, which `fallow audit` reads.
-- `vp run build`: `vp pack` → `dist/`.
-- `pnpm audit --audit-level high`: the dependency audit CI runs (network).
-- `pnpm changeset`: add a changeset.
-
-`vp` is the global Vite+ CLI the SessionStart hook installs at the catalog pin (it delegates to the checkout's `node_modules/.bin/vp`); `./node_modules/.bin/vp` works without it. The only non-`vp` invocations are `pnpm install`, `pnpm audit` and `pnpm changeset` / `pnpm publish` on the release path.
-
-## Verification
-
-Before you report work as done, run the gates below in order and quote each command with its final pass/fail. If a gate can't run here, say which and why; never imply it ran.
-
-1. From a clean install, which is what CI sees: `rm -rf node_modules dist coverage && pnpm install --frozen-lockfile`
-2. `vp check`
-3. `vp run check`
-4. `vp run test:unit`
-5. `vp run test:coverage`
-6. `vp run build`
-7. `pnpm audit --audit-level high` (network)
-8. `vp exec fallow audit --format json --quiet --explain --gate-marker agent --base origin/trunk` (the fallow gate below; not a CI step), which reads the map step 5 wrote. The verdict must not be `fail`.
-
-Steps 2–7 are CI's `ci` job, in its order ([ci.yml](.github/workflows/ci.yml)).
-
-## Branches and pull requests
-
-- **Branch off `trunk`; PR against `trunk`; squash-merge with a conventional prefix** (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`). `trunk` is the default branch; there is no `main`. Rebase onto `origin/trunk` before opening or updating a PR; never merge `trunk` into your branch.
-- **Changesets.** Every change to the published package's behaviour or its emitted `.d.ts` carries a changeset (`pnpm changeset`); a doc-comment change is a `patch`; docs-, CI- and tooling-only changes need none. Never publish or version by hand: the Release workflow opens the version PR (`chore: version packages`) and the owner merges it. See [PUBLISHING.md](PUBLISHING.md).
-- **No standing PR approval.** Push your branch; open a PR only when asked.
-- **GitHub scope.** GitHub writes go to `thomasfosterau/effect-ical` only. Read other repos (the sibling libraries) for reference only.
-
-## Work tracker
-
-GitHub issues are the backlog: when you find work you can't do now, file an issue rather than leaving a TODO. The issue is the spec; later comments override the body. Re-verify an issue's claims against current `trunk` before acting on it. Record decisions as issue comments.
-
-## Effect
-
-Never guess at an Effect API: read the installed package. The pinned version is the `effect` entry in `pnpm-workspace.yaml`'s catalog; its declarations are in `node_modules/effect/dist/*.d.ts`, its source in `node_modules/effect/src`. Effect 4 names to know: `Result` (not `Either`), `Effect.result` / `Effect.fromResult`, `Schema.Literals([...])`, `Schema.TaggedError<Self>()(tag, fields)`, `Effect.catch` (not `catchAll`).
-
-## Agent sessions
-
-- The SessionStart hook (`.claude/hooks/session-start.sh`, registered in `.claude/settings.json`) installs the global Vite+ CLI at the catalog's `vite-plus` pin with the official installer (npm-provenance and SHA-512 checked; it needs `vite.plus` and `viteplus.dev` on the environment's allowlist), links `vp` and `vpx` into `~/.local/bin` (the CLI lives under `$VP_HOME` when set, as in the Vite+ container image, else `~/.local/share/vite-plus`), and runs `vp install --frozen-lockfile` (pnpm through Corepack only without the global CLI), which also applies the tsgo patch. It removes the `fallow` shim and the walking `vp` shim earlier versions put there. Everything else goes through Vite+: `vp exec fallow …` for fallow, `vpx <file>.ts` for scripts; the global `vp` delegates to each checkout's own `vite-plus`, worktrees included. If the installer can't run, `vp` falls back to this checkout's `node_modules` copy. It hydrates no secrets; nothing here needs one.
-- A PreToolUse hook (`.claude/hooks/fallow-gate.sh`) blocks `git commit` / `git push` when `fallow audit --base origin/trunk` fails; it reads the coverage map on disk, so run `vp run test:coverage` first. It runs only in this project and its `.claude/worktrees/<name>` checkouts (judged on the checkout's top level, so a commit from a subdirectory is still audited, and neither a repository nested inside a worktree nor a separate clone placed at a worktree path, which shares no git directory with this project, is trusted), with fallow as `vp exec fallow` (the checkout's own pinned copy); from any other tree it skips with a notice and runs none of that tree's tooling. A PostToolUse hook runs `vp fmt` on every source, JSON, CSS or Markdown file you write or edit.
-
-## Documentation surfaces
-
-- `README.md`: the landing page and the npm-facing API reference. Every example in it must compile against the current API.
-- `examples/*.ts`: runnable programs, executed by `tests/examples.test.ts`.
-- `CONTRIBUTING.md` (human setup), `SECURITY.md` (reporting, supply chain), `PUBLISHING.md` (release pipeline and the owner's one-time setup).
-- This file: agent guidance. Decisions go in issue comments.
-
----
-
-## Fallow local gate
-
-Before any `git commit` or `git push`, run `fallow audit --format json --quiet --explain --gate-marker agent`. If the verdict is `fail`, fix the reported findings before retrying. Treat JSON runtime errors like `{ "error": true, ... }` as non-blocking. Audit defaults to `gate=new-only`: only findings introduced by the current changeset affect the verdict. The config is `.fallowrc.json`: a new published entry point joins its `entry` list.
-
-## Fallow task map
-
-| When the agent is about to... | Run |
-| --- | --- |
-| delete an "unused" export or file | `fallow dead-code --trace <file>:<export>` |
-| delete an "unused" dependency | `fallow dead-code --trace-dependency <name>` |
-| commit or open a PR | `fallow audit --base <ref>` |
-| check which architecture rules apply to a file before changing it | `fallow guard <files>` |
-| understand a finding | `fallow explain <issue-type>` |
+Before a commit or push, run `vp run test:coverage`, then `vp exec fallow audit --format json --quiet --explain --gate-marker agent --base origin/trunk`. On a `fail` verdict, fix the findings the change introduced; treat a `{ "error": true }` result as non-blocking. Useful commands: `fallow dead-code --trace <file>:<export>`, `fallow explain <issue-type>`.

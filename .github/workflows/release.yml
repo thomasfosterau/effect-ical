@@ -31,8 +31,8 @@ jobs:
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           version-file: pnpm-workspace.yaml
-          run-install: false
-      - run: vp install --frozen-lockfile --ignore-scripts
+          run-install: |
+            - args: ["--frozen-lockfile", "--ignore-scripts"]
       - name: Select mode
         id: mode
         uses: changesets/action/select-mode@v2.1.2
@@ -58,8 +58,8 @@ jobs:
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           version-file: pnpm-workspace.yaml
-          run-install: false
-      - run: vp install --frozen-lockfile --ignore-scripts
+          run-install: |
+            - args: ["--frozen-lockfile", "--ignore-scripts"]
       - name: Create or update the version PR
         uses: changesets/action/version@v2.1.2
         with:
@@ -92,8 +92,8 @@ jobs:
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           version-file: pnpm-workspace.yaml
-          run-install: false
-      - run: vp install --frozen-lockfile --ignore-scripts
+          run-install: |
+            - args: ["--frozen-lockfile", "--ignore-scripts"]
       - name: Publish
         uses: changesets/action/publish@v2.1.2
         with:

@@ -28,9 +28,10 @@
   },
   "files": [
     "dist",
+    "docs/api.md",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE.md"
   ],
   "type": "module",
   "sideEffects": false,
