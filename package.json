@@ -69,7 +69,7 @@
     "access": "public"
   },
   "scripts": {
-    "prepare": "vp config && effect-tsgo patch --typescript --oxlint"
+    "prepare": "vp config && effect-tsgo patch --typescript --oxlint --tsrs"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
