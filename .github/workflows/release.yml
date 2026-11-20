@@ -46,6 +46,7 @@ jobs:
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           version-file: pnpm-workspace.yaml
+          node-version: lts
           cache: false
           run-install: |
             - args: ["--frozen-lockfile", "--ignore-scripts"]
@@ -74,6 +75,7 @@ jobs:
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           version-file: pnpm-workspace.yaml
+          node-version: lts
           cache: false
           run-install: |
             - args: ["--frozen-lockfile", "--ignore-scripts"]
@@ -97,22 +99,26 @@ jobs:
       contents: write # release tags and GitHub releases
       id-token: write # npm trusted publishing
     env:
-      # Otherwise pnpm 11 may re-install with lifecycle scripts before a
+      # Otherwise pnpm may re-install with lifecycle scripts before a
       # `pnpm run`, undoing `--ignore-scripts` in a job holding `id-token`.
       pnpm_config_verify_deps_before_run: "false"
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           version-file: pnpm-workspace.yaml
+          node-version: lts
           cache: false
           run-install: |
             - args: ["--frozen-lockfile", "--ignore-scripts"]
+      # `vp run release` (vite.config.ts): builds, publishes the version if npm
+      # doesn't have it yet with `vp pm publish -r` (pnpm, which exchanges the
+      # OIDC token itself), then `changeset git-tag` reports the new tag through
+      # CHANGESETS_OUTPUT, and the action pushes it and creates the release.
       - name: Publish
         uses: changesets/action/publish@v2.1.2
         with:
-          script: vp run changeset:publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          script: vp run release

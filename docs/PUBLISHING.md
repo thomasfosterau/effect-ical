@@ -6,7 +6,9 @@
 
 1. A PR with a changeset merges into `trunk`.
 2. The Release workflow ([release.yml](../.github/workflows/release.yml)) opens or updates the `chore: version packages` PR, which bumps the version and writes `CHANGELOG.md`.
-3. The owner approves that PR's CI run (runs on `github-actions[bot]` commits wait for approval), then merges it. The next Release run builds and publishes with `changeset publish` (`pnpm publish`, which does the OIDC exchange itself) after the `release` environment's approval.
+3. The owner approves that PR's CI run (runs on `github-actions[bot]` commits wait for approval), then merges it. After the `release` environment's approval, the next Release run runs `vp run release`: the build, then `vp pm publish -r --access public --no-git-checks -- --ignore-scripts` (pnpm publishes the version if npm doesn't have it yet, doing the OIDC exchange itself; a re-run publishes nothing), then `changeset git-tag`, which tags the version and reports the tag to the Changesets action, which pushes it and creates the GitHub release. A failed publish stops before tagging. There is no publish script, and the release path calls neither `npm` nor `pnpm` directly.
+
+`vp run release:dry-run` builds and shows what `vp pm publish` would publish, without publishing or tagging.
 
 Don't add `--provenance`: the repository is private, and an explicit provenance request fails the publish.
 
@@ -17,3 +19,5 @@ The release jobs install with `--ignore-scripts` and set `pnpm_config_verify_dep
 1. On npmjs.com, for `@thomasfosterau/effect-ical`: Settings → Trusted Publisher → GitHub Actions, repository `thomasfosterau/effect-ical`, workflow `release.yml`, environment `release`.
 2. In the repository settings, Environments → `release`: add required reviewers.
 3. Settings → Actions → General: allow GitHub Actions to create and approve pull requests.
+
+A trusted publisher can only be attached to a package that exists. To publish a first version by hand, from a clean `trunk` as `thomasfosterau`: `vp install --frozen-lockfile`, `vp run release:dry-run`, then `vp run release`, then `git push origin --tags`.

@@ -16,7 +16,10 @@ Read [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) fir
 - **No loops or recursion over lines.** The line scanner is `Arr.unfold` (linear, stack-safe); recursion happens only per nesting level, so very large calendars still parse.
 - **`effect-tsgo patch` is version-locked.** `@effect/tsgo`, `@typescript/native` and `vite-plus` move together, or `vp install` fails; read the catalog comments first.
 - **`sideEffects: false`**: no top-level statements in `src/`.
+- **Publish only through the Release workflow** (`vp run release`; there is no publish script). Release-path registry calls go through `vp pm`, never `npm` / `pnpm` directly; `vp pm view` fails inside this repo (`devEngines.runtime` is `lts`), so rely on `vp pm publish -r` skipping published versions.
 
 ## Fallow
 
-The pre-commit hook runs `vp run fallow:audit`; fix the findings your change introduces. Useful commands: `vp exec fallow dead-code --trace <file>:<export>`, `vp exec fallow explain <issue-type>`.
+The pre-commit hook runs `vp run fallow:audit`; fix the findings your change introduces. Before deleting "unused" code, trace it: `vp exec fallow dead-code --trace <file>:<export>`.
+
+`vp install` links the `fallow` skill into `.claude/skills/fallow` from the installed package (approved under `permissions` in `pnpm-workspace.yaml`).
