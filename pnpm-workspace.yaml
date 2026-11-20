@@ -12,7 +12,7 @@ catalog:
   # on any other. Moves with `@typescript/native` and `vite-plus`.
   "@effect/tsgo": 0.63.0
   "@enfect/oxlint": ^0.10.0
-  "@thomasfosterau/effect-parse": ^0.5.0
+  "@thomasfosterau/effect-parse": ^0.6.2
   "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles.
   "@vitest/coverage-istanbul": 5.0.5
@@ -33,7 +33,7 @@ catalog:
 # requires a newer one.
 catalogs:
   peers:
-    "@thomasfosterau/effect-parse": ^0.5.0
+    "@thomasfosterau/effect-parse": ^0.6.2
     effect: ^4.0.0
 
 overrides:
