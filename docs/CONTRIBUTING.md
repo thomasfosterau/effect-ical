@@ -41,4 +41,4 @@ CI ([ci.yml](../.github/workflows/ci.yml)) runs `vp run ci` on Node `lts` and `l
 
 ## Changesets
 
-Every change to the published package's behaviour or its `.d.ts` (doc comments included, as a `patch`) needs a changeset: `vp exec changeset`. Docs-, CI- and tooling-only changes need none. Never version or publish by hand: the Release workflow opens the `chore: version packages` PR, and merging it publishes. See [PUBLISHING.md](PUBLISHING.md).
+Every change to the published package's behaviour or its `.d.ts` (doc comments included, as a `patch`) needs a changeset: `vp exec changeset`. Docs-, CI- and tooling-only changes need none. Never version or publish by hand: the Release workflow opens the `chore: version packages` PR, and merging it publishes (`vp run release`; `vp run release:dry-run` shows what it would publish). See [PUBLISHING.md](PUBLISHING.md).
