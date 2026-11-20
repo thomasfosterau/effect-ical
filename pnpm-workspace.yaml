@@ -16,7 +16,7 @@ catalog:
   "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles.
   "@vitest/coverage-istanbul": 5.0.5
-  effect: 4.1.2
+  effect: 4.1.4
   fallow: 3.43.2
   # TypeScript 6/7 side by side: JS-API consumers (the language service,
   # `vp pack`'s declaration bundler) need TS6 as `typescript` (bin `tsc6`);
