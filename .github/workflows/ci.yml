@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [trunk]
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, closed]
   push:
     branches: [trunk]
 
@@ -15,6 +15,7 @@ permissions: {}
 
 jobs:
   ci:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -41,6 +42,7 @@ jobs:
       - run: vp run ci
 
   devcontainer:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -58,3 +60,117 @@ jobs:
           run-install: false
       - run: vp dlx "$DEVCONTAINER_CLI" up --workspace-folder .
       - run: vp dlx "$DEVCONTAINER_CLI" exec --workspace-folder . vp --version
+
+  # Files (or updates) one issue per Dependabot PR that fails CI, unless trunk's
+  # own CI is failing too; closes it once the PR passes or is closed. Reads only
+  # the API: no checkout, so no PR code runs here.
+  report-dependabot-failure:
+    needs: [ci, devcontainer]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      SERVER_URL: ${{ github.server_url }}
+      RUN_ID: ${{ github.run_id }}
+      RESULT: ${{ contains(needs.*.result, 'failure') && 'failure' || (contains(needs.*.result, 'cancelled') && 'cancelled' || 'success') }}
+      EVENT_ACTION: ${{ github.event.action }}
+      MERGED: ${{ github.event.pull_request.merged }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      ASSIGNEE: thomasfosterau
+    steps:
+      - name: File, update or close the PR's issue
+        run: |
+          set -euo pipefail
+          # DRY_RUN=1 prints each write instead of sending it.
+          write() { if [ -n "${DRY_RUN:-}" ]; then printf 'DRY RUN: gh api'; printf ' %q' "$@"; echo; else gh api "$@" > /dev/null; fi; }
+          run_url="$SERVER_URL/$REPO/actions/runs/$RUN_ID"
+          marker="<!-- dependabot-pr: $PR_NUMBER -->"
+          issue=$(gh api --paginate "repos/$REPO/issues?labels=dependencies&state=all&per_page=100" \
+            --jq ".[] | select(.pull_request == null and ((.body // \"\") | contains(\"$marker\"))) | \"\(.number) \(.state)\"" | awk "NR == 1")
+          number=${issue%% *} state=${issue#* }
+
+          close() {
+            [ "$state" = open ] || { echo "No open issue for PR #$PR_NUMBER."; return; }
+            write "repos/$REPO/issues/$number/comments" -f body="$1"
+            write -X PATCH "repos/$REPO/issues/$number" -f state=closed -f state_reason="$2"
+          }
+          if [ "$EVENT_ACTION" = closed ]; then
+            if [ "$MERGED" = true ]; then close "PR #$PR_NUMBER was merged." completed
+            else close "PR #$PR_NUMBER was closed without merging." not_planned; fi
+            exit 0
+          fi
+          case "$RESULT" in
+            success) close "CI passes on PR #$PR_NUMBER ([run]($run_url))." completed; exit 0 ;;
+            failure) ;;
+            *) echo "CI result is $RESULT; nothing to do."; exit 0 ;;
+          esac
+
+          trunk=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=trunk&event=push&status=completed&per_page=1" \
+            --jq '.workflow_runs[0] | "\(.conclusion) \(.html_url)"')
+          if [ "${trunk%% *}" != success ]; then
+            echo "trunk's latest CI run is not green (${trunk}); not filing an issue."
+            exit 0
+          fi
+
+          jobs=$(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.conclusion == "failure") | . as $j
+            | "- [\($j.name)](\($j.html_url))" + ([$j.steps[] | select(.conclusion == "failure") | "[\(.name)](\($j.html_url)#step:\(.number):1)"]
+            | if length > 0 then ": " + join(", ") else "" end)')
+          first_job=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '[.jobs[] | select(.conclusion == "failure")][0].id // empty')
+          updates=$(printf '%s\n' "$PR_BODY" | grep -E '^Updates `[^`]+` from ' | sort -u | sed 's/^/- /' || true)
+          log=""
+          if [ -n "$first_job" ]; then
+            log=$(gh api "repos/$REPO/actions/jobs/$first_job/logs" 2> /dev/null | sed -E 's/^[0-9]{4}-[0-9-]+T[0-9:.]+Z ?//' || true)
+            last=$(printf '%s\n' "$log" | grep -n '^##\[error\]' | tail -n 1 | cut -d: -f1 || true)
+            log=$(printf '%s\n' "$log" | head -n "${last:-0}" | tail -n 40 | sed -E -e '/^##\[(end)?group\]$/d' -e 's/^##\[(end)?group\]//' -e 's/^##\[error\]/Error: /')
+          fi
+
+          {
+            echo "$marker"
+            echo "Dependabot PR $PR_URL fails [CI]($run_url)."
+            echo
+            echo "**Failing jobs**"
+            echo
+            echo "${jobs:-- (none reported)}"
+            echo
+            echo "**Updates**"
+            echo
+            echo "${updates:-- $PR_TITLE}"
+            if [[ "$HEAD_REF" == *toolchain* ]]; then
+              echo
+              echo "This is the \`toolchain\` group: make the hand edits in [CONTRIBUTING](${SERVER_URL}/${REPO}/blob/trunk/docs/CONTRIBUTING.md#workflow) on the PR's branch."
+            fi
+            if [ -n "$log" ]; then
+              echo
+              echo "<details><summary>Log excerpt (first failing job)</summary>"
+              echo
+              echo '````text'
+              echo "$log"
+              echo '````'
+              echo
+              echo "</details>"
+            fi
+            echo
+            echo "---"
+            echo "_Filed automatically when a Dependabot PR failed CI._"
+          } > "${RUNNER_TEMP:-.}/body.md"
+          title="Dependabot PR #$PR_NUMBER fails CI: $PR_TITLE"
+          echo "$title"; cat "${RUNNER_TEMP:-.}/body.md"
+
+          gh api "repos/$REPO/labels/dependencies" > /dev/null 2>&1 \
+            || write "repos/$REPO/labels" -f name=dependencies -f color=0366d6 -f description="Pull requests that update a dependency file"
+          if [ -z "$number" ]; then
+            write "repos/$REPO/issues" -f title="$title" -F "body=@${RUNNER_TEMP:-.}/body.md" -f "labels[]=dependencies" -f "assignees[]=$ASSIGNEE"
+          else
+            write -X PATCH "repos/$REPO/issues/$number" -f title="$title" -F "body=@${RUNNER_TEMP:-.}/body.md" -f state=open
+          fi

@@ -4,7 +4,13 @@
 
 - Branch off `trunk` and open a pull request into `trunk`; never commit to `trunk` directly. Open a draft PR as soon as you start, and keep one PR per change, however large. Squash-merge with a conventional prefix (`feat:`, `fix:`, `docs:`, `chore:`). Rebase onto `origin/trunk` rather than merging it in.
 - File an issue for anything you notice that is out of scope, and keep issue bodies evergreen: edit the body as understanding improves rather than appending comments.
-- Dependabot keeps dependencies current. Its `toolchain` group needs hand edits on the same branch: the npm-alias catalog entries (`vite` must equal `vite-plus`; `typescript` / `@typescript/native` must be a pair `@effect/tsgo` supports), an `@effect/tsgo` release that supports the new oxlint, and the devcontainer image tag.
+- Dependabot keeps dependencies current. Its `toolchain` group needs hand edits on the same branch:
+  - `vp dlx --package=vite-plus@<v> vp migrate --no-interactive`, dropping the `minimumReleaseAgeExclude` entries it adds;
+  - the npm aliases `vite` and `vitest` (and `@vitest/coverage-istanbul`) set to what the new `vite-plus` depends on, which isn't necessarily its own version;
+  - `typescript` / `@typescript/native` as a pair, and an `@effect/tsgo` release, that support the new oxlint (its `components` table, `node_modules/@effect/tsgo/dist/effect-tsgo.cjs`), or `prepare` fails `vp install`;
+  - the devcontainer image tag set to the new `vite-plus`.
+
+  When a Dependabot PR fails CI while `trunk`'s CI is green, CI files an issue for it (updated in place, closed once the PR passes or closes).
 
 ## Toolchain
 
