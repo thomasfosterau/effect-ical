@@ -159,3 +159,6 @@ vite.config.ts.timestamp-*
 .fallow
 fallow.sarif
 .vitest/
+
+# docgen output (`vp run docgen`), published by the Pages workflow.
+docs/reference/

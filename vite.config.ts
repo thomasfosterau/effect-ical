@@ -90,6 +90,9 @@ export default defineConfig({
   },
   run: {
     tasks: {
+      // The API reference the Pages workflow publishes. Examples are
+      // rendered but not compiled (`tscExecutable: "true"` in docgen.json).
+      docgen: { command: "docgen", cache: false },
       // Everything CI runs, in order. `vp run ci` locally is the same run.
       ci: {
         command:
