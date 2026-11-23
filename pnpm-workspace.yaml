@@ -16,7 +16,7 @@ catalog:
   "@thomasfosterau/effect-parse": ^0.6.2
   "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles.
-  "@vitest/coverage-istanbul": 5.1.0
+  "@vitest/coverage-istanbul": 5.1.1
   effect: 4.1.4
   fallow: 3.44.0
   # TypeScript 6/7 side by side: JS-API consumers (the language service,
@@ -28,7 +28,7 @@ catalog:
   # (`npm view vite-plus@<v> dependencies`); `vite` no longer equals vite-plus.
   vite-plus: 1.7.0
   vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
-  vitest: 5.1.0
+  vitest: 5.1.1
 
 # Peer ranges of the published package. Raise `effect` only when a dependency
 # requires a newer one.
