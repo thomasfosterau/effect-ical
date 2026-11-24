@@ -18,7 +18,7 @@ catalog:
   # Must equal the vitest that vite-plus bundles.
   "@vitest/coverage-istanbul": 5.1.0
   effect: 4.1.4
-  fallow: 3.44.0
+  fallow: 3.46.0
   # TypeScript 6/7 side by side: JS-API consumers (the language service,
   # `vp pack`'s declaration bundler) need TS6 as `typescript` (bin `tsc6`);
   # `@typescript/native` is TS7 (bin `tsc`), patched by @effect/tsgo.
