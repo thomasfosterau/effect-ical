@@ -92,12 +92,6 @@
     "@thomasfosterau/effect-parse": "catalog:peers",
     "effect": "catalog:peers"
   },
-  "devEngines": {
-    "runtime": {
-      "name": "node",
-      "version": "lts"
-    }
-  },
   "engines": {
     "node": ">=22"
   },
