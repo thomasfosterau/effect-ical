@@ -1,5 +1,11 @@
 # @thomasfosterau/effect-ical
 
+## 0.1.1
+
+### Patch Changes
+
+- 259f2ca: Add the `./Calendar`, `./ContentLine`, `./Event`, `./Todo` and `./VCard` subpath exports.
+
 ## 0.1.0
 
 ### Minor Changes
